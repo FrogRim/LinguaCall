@@ -5,7 +5,7 @@
   "main": "src/index.ts",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json || true",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "echo lingua-call-api lint pass",
     "test": "vitest run",

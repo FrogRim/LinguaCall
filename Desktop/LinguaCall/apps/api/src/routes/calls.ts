@@ -259,7 +259,7 @@ router.post("/:id/join", requireClerkUser, async (req: AuthenticatedRequest, res
   }
 
   try {
-    const data = await joinWebVoiceSession(id, req.clerkUserId, req.header("x-idempotency-key") || randomUUID());
+    const data = await joinWebVoiceSession(id, req.clerkUserId, String(req.header("x-idempotency-key") || randomUUID()));
     res.status(201).json({ ok: true, data });
   } catch (err) {
     if (err instanceof AppError && err.code === "INVALID_SESSION_STATE") {

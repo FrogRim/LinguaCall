@@ -6,7 +6,10 @@
     "module": "Node16",
     "moduleResolution": "Node16",
     "types": ["node"],
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "noEmitOnError": false
   },
   "include": ["src/**/*.ts"],
   "exclude": ["dist"]

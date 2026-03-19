@@ -26,7 +26,7 @@ const envOrDefault = (...keys: string[]) => keys.map((key) => process.env[key]?.
 
 const toJson = async (response: unknown) => {
   try {
-    return await response.json();
+    return await (response as Response).json();
   } catch {
     return {};
   }

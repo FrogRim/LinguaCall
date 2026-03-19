@@ -1,4 +1,4 @@
-﻿import { randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { ALLOWED_LANGUAGE_EXAM_PAIRS } from "../config/languageExam";
 import { Pool, PoolClient } from "pg";
 import {
@@ -101,6 +101,7 @@ interface DbSessionRow {
   accuracy_state: unknown | null;
   reserved_trial_call: boolean;
   reserved_minutes: number;
+  provider_call_sid: string | null;
   last_provider_sequence_number: number;
   created_at: string;
   updated_at: string;
@@ -257,7 +258,7 @@ const DB_ERROR = {
   INVALID_SESSION_ID: "INVALID_SESSION_ID",
   REPORT_NOT_FOUND: "REPORT_NOT_FOUND",
   INSUFFICIENT_ALLOWANCE: "INSUFFICIENT_ALLOWANCE"
-};
+} as const;
 
 const MAX_SESSION_MINUTES = 10;
 
@@ -400,8 +401,8 @@ class InMemoryStore {
   }
 
   private mapSession(row: DbSessionRow): Session {
-    const accuracyPolicy = asObject(row.accuracy_policy) as SessionAccuracyPolicy | undefined;
-    const accuracyState = asObject(row.accuracy_state) as SessionAccuracyState | undefined;
+    const accuracyPolicy = asObject(row.accuracy_policy) as unknown as SessionAccuracyPolicy | undefined;
+    const accuracyState = asObject(row.accuracy_state) as unknown as SessionAccuracyState | undefined;
     return {
       id: row.id,
       publicId: row.public_id,
@@ -2675,7 +2676,7 @@ class InMemoryStore {
 
       const callId = sessionRow.call_id ?? `WV_${randomUUID().replace(/-/g, "").slice(0, 18)}`;
       const accuracyPolicy =
-        (asObject(sessionRow.accuracy_policy) as SessionAccuracyPolicy | undefined) ??
+        (asObject(sessionRow.accuracy_policy) as unknown as SessionAccuracyPolicy | undefined) ??
         buildSessionAccuracyPolicy(this.mapSession(sessionRow));
       const updated = await client.query<DbSessionRow>(
         `
@@ -3058,7 +3059,7 @@ class InMemoryStore {
 
   private async writeWebhookEvent(
     client: PoolClient,
-    provider: "twilio" | "kakao" | "telegram" | "payments" | "media",
+    provider: "twilio" | "kakao" | "telegram" | "payments" | "media" | "media_stream",
     dedupeKey: string,
     payload: Record<string, unknown>,
     eventType = "media_stream"
@@ -3128,7 +3129,7 @@ class InMemoryStore {
       }
 
       await client.query("COMMIT");
-      return this.mapSession(updated);
+      return this.mapSession(updated.rows[0]);
     } catch (error) {
       await client.query("ROLLBACK");
       if (error instanceof AppError) {
@@ -3712,7 +3713,7 @@ class InMemoryStore {
     clerkUserId: ClerkUserId,
     idempotencyKey: string,
     options: OutboundCallOptions = {}
-  ): Promise<StartCallResponse> {
+  ): Promise<StartCallResponse | Pick<StartCallResponse, "sessionId" | "callId" | "status">> {
     const idempotency = idempotencyKey || randomUUID();
     const session = await this.getSession(clerkUserId, sessionId);
 
@@ -3784,7 +3785,7 @@ class InMemoryStore {
         }
       }
 
-      const existing = await client.query<DbWebhookPayload>(
+      const existing = await client.query<DbSessionQueryResult>(
         "SELECT payload FROM webhook_events WHERE dedupe_key = $1 LIMIT 1",
         [dedupeKey]
       );
@@ -3798,7 +3799,7 @@ class InMemoryStore {
         };
       }
 
-      const callId = sessionRow.callId ?? `CA_${randomUUID().replace(/-/g, "").slice(0, 18)}`;
+      const callId = sessionRow.call_id ?? `CA_${randomUUID().replace(/-/g, "").slice(0, 18)}`;
 
       const updateResult = await client.query(
         `
@@ -4231,7 +4232,7 @@ class InMemoryStore {
         const terminalSession = await this.applySessionTerminalTransition(
           client,
           session,
-          nextStatus,
+          nextStatus as Exclude<SessionStatus, "ready" | "scheduled" | "dialing" | "ringing" | "in_progress" | "ending">,
           failureReason,
           {
             providerCallSid: callSid,
