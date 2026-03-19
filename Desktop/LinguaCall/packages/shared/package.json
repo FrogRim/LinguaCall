@@ -1,0 +1,15 @@
+{
+  "name": "@lingua/shared",
+  "private": true,
+  "version": "0.1.0",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "echo shared package has no build output",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo shared package lint pass"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.2"
+  }
+}

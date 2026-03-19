@@ -1,0 +1,10 @@
+{
+  "name": "@lingua/db",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "build": "echo db package has sql assets only",
+    "typecheck": "echo db package typecheck pass",
+    "lint": "echo db package lint pass"
+  }
+}
