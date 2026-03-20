@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import LanguagePicker from '../components/ui/LanguagePicker';
 import type {
   Session,
   BillingPlan,
@@ -77,6 +79,7 @@ type DetailState =
   | { kind: 'error'; message: string };
 
 export default function ScreenSession() {
+  const { t } = useTranslation();
   const { clerkUserId, clearIdentity } = useUser();
   const navigate = useNavigate();
 
@@ -116,17 +119,31 @@ export default function ScreenSession() {
       defaultTopic: 'vida cotidiana',
       levelOptions: ['A1', 'A2', 'B1'],
       topicOptions: ['vida cotidiana', 'viajes y turismo', 'trabajo y profesión', 'cultura y sociedad', 'salud', 'tecnología']
+    },
+    ja: {
+      exam: 'jlpt_n2',
+      defaultLevel: 'N3',
+      defaultTopic: '仕事と日常生活',
+      levelOptions: ['N4', 'N3', 'N2', 'N1'],
+      topicOptions: ['仕事と日常生活', '旅行と観光', '社会と文化', '技術と革新', '環境と自然', '教育と学習', '健康と生活']
+    },
+    fr: {
+      exam: 'delf_b1',
+      defaultLevel: 'A2',
+      defaultTopic: 'vie quotidienne',
+      levelOptions: ['A1', 'A2', 'B1'],
+      topicOptions: ['vie quotidienne', 'voyages et tourisme', 'travail et carrière', 'culture et société', 'santé', 'technologie', 'environnement']
     }
   };
 
   // Form state
-  const [language, setLanguage] = useState<'en' | 'de' | 'zh' | 'es'>('en');
+  const [language, setLanguage] = useState<'en' | 'de' | 'zh' | 'es' | 'ja' | 'fr'>('en');
   const [mode, setMode] = useState<'immediate' | 'scheduled_once'>('immediate');
   const [level, setLevel] = useState('IM3');
   const [topic, setTopic] = useState('daily conversation');
   const [duration, setDuration] = useState(10);
 
-  const handleLanguageChange = (lang: 'en' | 'de' | 'zh' | 'es') => {
+  const handleLanguageChange = (lang: 'en' | 'de' | 'zh' | 'es' | 'ja' | 'fr') => {
     const cfg = LANG_CONFIGS[lang];
     setLanguage(lang);
     setLevel(cfg.defaultLevel);
@@ -405,12 +422,13 @@ export default function ScreenSession() {
         {/* Header */}
         <div className="flex items-center justify-between py-4">
           <h1 className="text-2xl font-bold tracking-tighter text-foreground">LinguaCall</h1>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            <LanguagePicker />
             <Button variant="outline" size="sm" onClick={() => navigate('/billing')}>
-              Billing
+              {t('nav.billing')}
             </Button>
             <Button variant="ghost" size="sm" onClick={clearIdentity}>
-              Sign Out
+              {t('nav.signOut')}
             </Button>
           </div>
         </div>
@@ -427,7 +445,7 @@ export default function ScreenSession() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse inline-block" />
-                Live Session
+                {t('session.transcript')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -454,11 +472,11 @@ export default function ScreenSession() {
                   size="sm"
                   onClick={async () => {
                     if (!activeRef.current?.controller) return;
-                    syncActive({ ...activeRef.current, state: 'ending', note: 'Ending...' });
+                    syncActive({ ...activeRef.current, state: 'ending', note: t('session.endCall') });
                     await activeRef.current.controller.end();
                   }}
                 >
-                  End Call
+                  {t('session.endCall')}
                 </Button>
               )}
             </CardContent>
@@ -468,15 +486,15 @@ export default function ScreenSession() {
         {/* Create Session Form */}
         <Card>
           <CardHeader>
-            <CardTitle>Create Session</CardTitle>
+            <CardTitle>{t('session.newSession')}</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={e => void handleFormSubmit(e)} className="space-y-6">
               {/* Language / Contact Mode row */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Language</Label>
-                  <Select value={language} onValueChange={(v) => handleLanguageChange(v as 'en' | 'de' | 'zh' | 'es')}>
+                  <Label>{t('session.language')}</Label>
+                  <Select value={language} onValueChange={(v) => handleLanguageChange(v as 'en' | 'de' | 'zh' | 'es' | 'ja' | 'fr')}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -485,18 +503,20 @@ export default function ScreenSession() {
                       <SelectItem value="de">🇩🇪 Deutsch — Goethe B2</SelectItem>
                       <SelectItem value="zh">🇨🇳 中文 — HSK 5</SelectItem>
                       <SelectItem value="es">🇪🇸 Español — DELE B1</SelectItem>
+                      <SelectItem value="ja">🇯🇵 日本語 — JLPT N2</SelectItem>
+                      <SelectItem value="fr">🇫🇷 Français — DELF B1</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Contact Mode</Label>
+                  <Label>{t('session.mode')}</Label>
                   <Select value={mode} onValueChange={(v) => setMode(v as 'immediate' | 'scheduled_once')}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="immediate">Immediate</SelectItem>
-                      <SelectItem value="scheduled_once">Scheduled</SelectItem>
+                      <SelectItem value="immediate">{t('session.modeImmediate')}</SelectItem>
+                      <SelectItem value="scheduled_once">{t('session.modeScheduled')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -504,7 +524,7 @@ export default function ScreenSession() {
               {/* Level / Topic row */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Level</Label>
+                  <Label>{t('session.level')}</Label>
                   <Select value={level} onValueChange={setLevel}>
                     <SelectTrigger>
                       <SelectValue />
@@ -517,7 +537,7 @@ export default function ScreenSession() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Topic</Label>
+                  <Label>{t('session.topic')}</Label>
                   <Select value={topic} onValueChange={setTopic}>
                     <SelectTrigger>
                       <SelectValue />
@@ -532,7 +552,7 @@ export default function ScreenSession() {
               </div>
               {/* Duration row */}
               <div className="space-y-2">
-                <Label>Duration (min)</Label>
+                <Label>{t('session.duration')}</Label>
                 <Select value={String(duration)} onValueChange={(v) => setDuration(Number(v))}>
                   <SelectTrigger>
                     <SelectValue />
@@ -546,7 +566,7 @@ export default function ScreenSession() {
               </div>
               {mode === 'scheduled_once' && (
                 <div className="space-y-2">
-                  <Label htmlFor="scheduledFor">Scheduled Time</Label>
+                  <Label htmlFor="scheduledFor">{t('session.scheduleTime')}</Label>
                   <Input
                     id="scheduledFor"
                     type="datetime-local"
@@ -558,7 +578,7 @@ export default function ScreenSession() {
               {formError && <p className="text-sm text-destructive">{formError}</p>}
               {formMessage && <p className="text-sm text-green-600">{formMessage}</p>}
               <Button type="submit" disabled={formLoading} className="w-full">
-                {formLoading ? 'Creating...' : 'Create Session'}
+                {formLoading ? t('session.creating') : t('session.createSession')}
               </Button>
             </form>
           </CardContent>
@@ -567,16 +587,16 @@ export default function ScreenSession() {
         {/* Sessions List */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle>My Sessions</CardTitle>
+            <CardTitle>{t('session.sessionList')}</CardTitle>
             <Button variant="outline" size="sm" onClick={() => void loadSessions()}>
-              Refresh
+              {t('common.retry')}
             </Button>
           </CardHeader>
           <CardContent>
             {sessionsLoading ? (
-              <p className="text-sm text-muted-foreground">Loading...</p>
+              <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
             ) : sessions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No sessions yet.</p>
+              <p className="text-sm text-muted-foreground">{t('session.noSessions')}</p>
             ) : (
               <div className="space-y-3">
                 {sessions.map(session => (
@@ -636,7 +656,7 @@ export default function ScreenSession() {
                           size="sm"
                           onClick={() => void beginWebVoiceSession(session.id, false)}
                         >
-                          Start Call
+                          {t('session.startCall')}
                         </Button>
                       )}
                       {session.status === 'scheduled' && canJoinScheduledSession(session) && (
@@ -644,7 +664,7 @@ export default function ScreenSession() {
                           size="sm"
                           onClick={() => void beginWebVoiceSession(session.id, true)}
                         >
-                          Join Session
+                          {t('session.joinSession')}
                         </Button>
                       )}
                       {session.status === 'scheduled' && (
@@ -653,7 +673,7 @@ export default function ScreenSession() {
                           variant="destructive"
                           onClick={() => void handleCancel(session.id)}
                         >
-                          Cancel
+                          {t('session.cancelSession')}
                         </Button>
                       )}
                       {['connecting', 'dialing', 'ringing', 'in_progress', 'ending'].includes(
@@ -664,7 +684,7 @@ export default function ScreenSession() {
                           variant="destructive"
                           onClick={() => void handleEndCall(session.id)}
                         >
-                          End Call
+                          {t('session.endCall')}
                         </Button>
                       )}
                       {session.status === 'completed' && (
@@ -674,14 +694,14 @@ export default function ScreenSession() {
                             variant="outline"
                             onClick={() => void handleViewReport(session.id)}
                           >
-                            View Report
+                            {t('session.viewReport')}
                           </Button>
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => void handleViewTranscript(session.id)}
                           >
-                            Transcript
+                            {t('session.viewTranscript')}
                           </Button>
                         </>
                       )}
@@ -691,7 +711,7 @@ export default function ScreenSession() {
                           variant="ghost"
                           onClick={() => void handleViewTranscript(session.id)}
                         >
-                          Transcript
+                          {t('session.viewTranscript')}
                         </Button>
                       )}
                     </div>
@@ -707,19 +727,19 @@ export default function ScreenSession() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle>
-                {detail.kind === 'transcript' ? 'Transcript' : 'Report'}
+                {detail.kind === 'transcript' ? t('session.viewTranscript') : t('report.title')}
               </CardTitle>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setDetail({ kind: 'idle' })}
               >
-                Close
+                {t('session.closeDetail')}
               </Button>
             </CardHeader>
             <CardContent>
               {detail.kind === 'loading' && (
-                <p className="text-sm text-muted-foreground">Loading...</p>
+                <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
               )}
               {detail.kind === 'error' && (
                 <p className="text-sm text-destructive">{detail.message}</p>
@@ -735,7 +755,7 @@ export default function ScreenSession() {
               {detail.kind === 'transcript' && (
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {detail.data.messages.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No transcript yet.</p>
+                    <p className="text-sm text-muted-foreground">{t('session.noTranscript')}</p>
                   ) : (
                     detail.data.messages.map(msg => (
                       <div key={msg.sequenceNo} className="text-xs">

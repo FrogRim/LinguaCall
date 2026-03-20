@@ -39,6 +39,7 @@ export interface UserProfile {
   trialCallsRemaining: number;
   paidMinutesBalance: number;
   planCode: string;
+  uiLanguage: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -37,7 +37,7 @@ import {
   sendTelegramReminder,
   sendTelegramReportSummary
 } from "../services/telegramNotifier";
-import { evaluateSessionForReport, parseReportEvaluatorPayload } from "../services/reportEvaluator";
+import { evaluateSessionForReport } from "../services/reportEvaluator";
 import { createOutboundCall, endOutboundCall } from "../services/callProvider";
 import {
   classifyTwilioFailureReason,
@@ -120,6 +120,7 @@ interface DbUserRow {
   trial_calls_remaining: number;
   paid_minutes_balance: number;
   plan_code: string;
+  ui_language: string;
   created_at: string;
   updated_at: string;
 }
@@ -346,6 +347,7 @@ class InMemoryStore {
       trialCallsRemaining: row.trial_calls_remaining,
       paidMinutesBalance: row.paid_minutes_balance,
       planCode: row.plan_code,
+      uiLanguage: row.ui_language ?? "en",
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
@@ -657,7 +659,7 @@ class InMemoryStore {
     messages: TranscriptMessage[]
   ): Promise<void> {
     const evaluatorInput = this.buildReportEvaluatorInput(session, messages);
-    const evaluation = parseReportEvaluatorPayload(evaluateSessionForReport(evaluatorInput));
+    const evaluation = await evaluateSessionForReport(evaluatorInput);
     const summaryText = evaluation.summary_text || "Session summary is ready.";
     const recommendations = evaluation.recommendations.length > 0
       ? evaluation.recommendations
@@ -1154,6 +1156,17 @@ class InMemoryStore {
     );
     if (!result.rows.length) {
       return undefined;
+    }
+    return this.toUserProfile(result.rows[0]);
+  }
+
+  async updateUiLanguage(clerkUserId: ClerkUserId, uiLanguage: string): Promise<UserProfile> {
+    const result = await this.pool.query<DbUserRow>(
+      "UPDATE users SET ui_language = $2, updated_at = NOW() WHERE clerk_user_id = $1 RETURNING *",
+      [clerkUserId, uiLanguage]
+    );
+    if (!result.rows.length) {
+      throw new AppError(DB_ERROR.USER_NOT_FOUND, "user not found");
     }
     return this.toUserProfile(result.rows[0]);
   }

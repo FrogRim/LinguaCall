@@ -51,5 +51,5 @@ export type FailureReason = keyof typeof failureReasons extends never
   ? never
   : (typeof failureReasons)[keyof typeof failureReasons];
 
-export type LessonLanguage = "en" | "de" | "zh" | "es";
-export type ExamType = "opic" | "goethe_b2" | "hsk5" | "dele_b1";
+export type LessonLanguage = "en" | "de" | "zh" | "es" | "ja" | "fr";
+export type ExamType = "opic" | "goethe_b2" | "hsk5" | "dele_b1" | "jlpt_n2" | "delf_b1";

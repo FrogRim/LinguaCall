@@ -131,14 +131,57 @@ describe("buildInstructions — AI 시스템 프롬프트 분기", () => {
     });
   });
 
+  describe("JA / JLPT N2 (일본어)", () => {
+    const instr = buildInstructions({
+      ...base,
+      language: "ja",
+      exam: "jlpt_n2",
+      level: "N3",
+      topic: "仕事と日常生活"
+    });
+
+    it("일본어 지시문 사용", () => {
+      expect(instr).toMatch(/LinguaCall/);
+    });
+    it("JLPT N2 언급", () => {
+      expect(instr).toMatch(/JLPT N2/);
+    });
+    it("topic 포함", () => {
+      expect(instr).toMatch(/仕事と日常生活/);
+    });
+    it("level 포함", () => {
+      expect(instr).toMatch(/N3/);
+    });
+  });
+
+  describe("FR / DELF B1 (프랑스어)", () => {
+    const instr = buildInstructions({
+      ...base,
+      language: "fr",
+      exam: "delf_b1",
+      level: "A2",
+      topic: "vie quotidienne"
+    });
+
+    it("프랑스어 지시문 사용", () => {
+      expect(instr).toMatch(/LinguaCall/);
+    });
+    it("DELF B1 언급", () => {
+      expect(instr).toMatch(/DELF B1/);
+    });
+    it("topic 포함", () => {
+      expect(instr).toMatch(/vie quotidienne/);
+    });
+  });
+
   describe("폴백 — 알 수 없는 언어/시험", () => {
     it("미지원 언어는 영어 기본 프롬프트로 폴백", () => {
       const instr = buildInstructions({
         ...base,
-        language: "ja",
-        exam: "jlpt_n2",
-        level: "N3",
-        topic: "日常会話"
+        language: "ko",
+        exam: "topik",
+        level: "3",
+        topic: "일상생활"
       });
       expect(instr).toMatch(/You are LinguaCall/);
     });

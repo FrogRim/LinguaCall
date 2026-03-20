@@ -57,6 +57,25 @@ router.post("/me", requireClerkUser, async (req: AuthenticatedRequest, res: Resp
   }
 });
 
+const UiLanguageSchema = z.object({
+  uiLanguage: z.enum(["en", "de", "zh", "es", "ja", "fr"])
+});
+
+router.patch("/me/ui-language", requireClerkUser, async (req: AuthenticatedRequest, res: Response<ApiResponse<UserProfile>>) => {
+  const parsed = UiLanguageSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(422).json({ ok: false, error: { code: "validation_error", message: "uiLanguage must be one of: en, de, zh, es, ja, fr" } });
+    return;
+  }
+  try {
+    const user = await store.updateUiLanguage(req.clerkUserId, parsed.data.uiLanguage);
+    res.json({ ok: true, data: user });
+  } catch (error) {
+    console.error("[users/me/ui-language] failed", { clerkUserId: req.clerkUserId, error });
+    res.status(500).json({ ok: false, error: { code: "validation_error", message: "failed_to_update_ui_language" } });
+  }
+});
+
 const PhoneStartSchema = z.object({ phone: z.string().min(8) });
 
 router.post("/phone/start", requireClerkUser, async (req: AuthenticatedRequest, res: Response<ApiResponse<{ maskedPhone: string; debugCode: string }>>) => {

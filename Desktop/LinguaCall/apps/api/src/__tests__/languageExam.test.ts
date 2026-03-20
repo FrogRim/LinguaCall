@@ -18,6 +18,12 @@ describe("Language / Exam pair validation", () => {
     it("ES + DELE B1 허용", () => {
       expect(isAllowed("es", "dele_b1")).toBe(true);
     });
+    it("JA + JLPT N2 허용", () => {
+      expect(isAllowed("ja", "jlpt_n2")).toBe(true);
+    });
+    it("FR + DELF B1 허용", () => {
+      expect(isAllowed("fr", "delf_b1")).toBe(true);
+    });
   });
 
   describe("차단되는 조합", () => {
@@ -30,8 +36,14 @@ describe("Language / Exam pair validation", () => {
     it("ZH + dele_b1 차단", () => {
       expect(isAllowed("zh", "dele_b1")).toBe(false);
     });
+    it("JA + opic 차단 (언어/시험 불일치)", () => {
+      expect(isAllowed("ja", "opic")).toBe(false);
+    });
+    it("FR + goethe_b2 차단 (언어/시험 불일치)", () => {
+      expect(isAllowed("fr", "goethe_b2")).toBe(false);
+    });
     it("존재하지 않는 언어 차단", () => {
-      expect(isAllowed("ja", "jlpt_n2")).toBe(false);
+      expect(isAllowed("ko", "topik")).toBe(false);
     });
     it("빈 문자열 차단", () => {
       expect(isAllowed("", "")).toBe(false);

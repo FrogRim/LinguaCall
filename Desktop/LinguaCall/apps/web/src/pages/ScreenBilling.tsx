@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import type { UserSubscription, BillingPlan } from '@lingua/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -7,8 +8,10 @@ import { Badge } from '../components/ui/badge';
 import { cn } from '../components/ui/cn';
 import { useUser } from '../context/UserContext';
 import { apiClient, describeApiError } from '../lib/api';
+import LanguagePicker from '../components/ui/LanguagePicker';
 
 export default function ScreenBilling() {
+  const { t } = useTranslation();
   const { clerkUserId } = useUser();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -88,20 +91,25 @@ export default function ScreenBilling() {
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center justify-between py-4">
-          <h1 className="text-2xl font-bold tracking-tighter text-foreground">LinguaCall</h1>
-          <Button variant="outline" size="sm" onClick={() => navigate('/session')}>
-            Sessions
-          </Button>
+          <h1 className="text-2xl font-bold tracking-tighter text-foreground">{t('common.appName')}</h1>
+          <div className="flex items-center gap-2">
+            <LanguagePicker />
+            <Button variant="outline" size="sm" onClick={() => navigate('/session')}>
+              {t('nav.sessions')}
+            </Button>
+          </div>
         </div>
 
         {checkoutResult === 'success' && (
           <div className="rounded-md bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-800">
-            Billing updated{checkoutPlan ? ` for plan ${checkoutPlan}` : ''}.
+            {t('billing.checkoutSuccess', {
+              plan: checkoutPlan ? t('billing.checkoutSuccessPlan', { plan: checkoutPlan }) : ''
+            })}
           </div>
         )}
         {checkoutResult === 'cancel' && (
           <div className="rounded-md bg-secondary border border-border px-3 py-2 text-sm text-secondary-foreground">
-            Checkout cancelled. Subscription is unchanged.
+            {t('billing.checkoutCancelled')}
           </div>
         )}
         {error && (
@@ -113,24 +121,24 @@ export default function ScreenBilling() {
         {/* Current Subscription */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle>Current Subscription</CardTitle>
+            <CardTitle>{t('billing.currentSubscription')}</CardTitle>
             <Button variant="outline" size="sm" onClick={() => void load()}>
-              Reload
+              {t('billing.reload')}
             </Button>
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-sm text-muted-foreground">Loading...</p>
+              <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
             ) : subscription ? (
               <div className="flex items-center gap-2">
                 <Badge>{subscription.planCode}</Badge>
                 <Badge variant="outline">{subscription.status}</Badge>
                 {subscription.cancelAtPeriodEnd && (
-                  <Badge variant="destructive">Cancels at period end</Badge>
+                  <Badge variant="destructive">{t('billing.cancelsAtPeriodEnd')}</Badge>
                 )}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No active subscription.</p>
+              <p className="text-sm text-muted-foreground">{t('billing.noSubscription')}</p>
             )}
           </CardContent>
         </Card>
@@ -138,24 +146,24 @@ export default function ScreenBilling() {
         {/* Provider selector */}
         <div className="flex items-center gap-3">
           <label className="text-sm text-muted-foreground whitespace-nowrap">
-            Payment Provider
+            {t('billing.paymentProvider')}
           </label>
           <select
             className="flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             value={provider}
             onChange={e => setProvider(e.target.value)}
           >
-            <option value="auto">Use server default</option>
-            <option value="stripe">Stripe</option>
-            <option value="mock">Mock</option>
+            <option value="auto">{t('billing.providerAuto')}</option>
+            <option value="stripe">{t('billing.providerStripe')}</option>
+            <option value="mock">{t('billing.providerMock')}</option>
           </select>
         </div>
 
         {/* Plans */}
         <div>
-          <h2 className="text-lg font-semibold tracking-tighter text-foreground mb-4">Available Plans</h2>
+          <h2 className="text-lg font-semibold tracking-tighter text-foreground mb-4">{t('billing.availablePlans')}</h2>
           {loading ? (
-            <p className="text-sm text-muted-foreground">Loading plans...</p>
+            <p className="text-sm text-muted-foreground">{t('billing.loadingPlans')}</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-stretch">
               {plans.map(plan => {
@@ -175,20 +183,20 @@ export default function ScreenBilling() {
                         <CardTitle className="text-base">{plan.displayName}</CardTitle>
                         {isCurrent && (
                           <Badge className="bg-indigo-600 text-white text-xs border-0">
-                            Current
+                            {t('billing.currentPlan')}
                           </Badge>
                         )}
                       </div>
                     </CardHeader>
                     <CardContent className="flex flex-col gap-4 flex-1">
                       <div className="text-3xl font-bold tracking-tighter text-foreground">
-                        {plan.priceKrw > 0 ? `₩${plan.priceKrw.toLocaleString()}` : 'Free'}
+                        {plan.priceKrw > 0 ? `₩${plan.priceKrw.toLocaleString()}` : t('billing.free')}
                         {plan.priceKrw > 0 && (
-                          <span className="text-sm font-normal text-muted-foreground"> /mo</span>
+                          <span className="text-sm font-normal text-muted-foreground">{t('billing.perMonth')}</span>
                         )}
                       </div>
                       <div className="text-xs text-muted-foreground flex-1">
-                        Max session: {plan.maxSessionMinutes}min
+                        {t('billing.maxSession', { min: plan.maxSessionMinutes })}
                       </div>
                       <Button
                         className="w-full mt-auto"
@@ -198,10 +206,10 @@ export default function ScreenBilling() {
                         disabled={checkoutLoading === plan.code}
                       >
                         {checkoutLoading === plan.code
-                          ? 'Processing...'
+                          ? t('billing.processing')
                           : isCurrent
-                          ? 'Current Plan'
-                          : `Upgrade to ${plan.displayName}`}
+                          ? t('billing.currentPlan')
+                          : t('billing.upgradeTo', { name: plan.displayName })}
                       </Button>
                     </CardContent>
                   </Card>
@@ -214,4 +222,3 @@ export default function ScreenBilling() {
     </div>
   );
 }
-
