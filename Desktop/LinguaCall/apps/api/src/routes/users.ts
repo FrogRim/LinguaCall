@@ -58,13 +58,13 @@ router.post("/me", requireClerkUser, async (req: AuthenticatedRequest, res: Resp
 });
 
 const UiLanguageSchema = z.object({
-  uiLanguage: z.enum(["en", "de", "zh", "es", "ja", "fr"])
+  uiLanguage: z.enum(["en", "ko", "ja", "zh", "de", "es", "fr"])
 });
 
 router.patch("/me/ui-language", requireClerkUser, async (req: AuthenticatedRequest, res: Response<ApiResponse<UserProfile>>) => {
   const parsed = UiLanguageSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(422).json({ ok: false, error: { code: "validation_error", message: "uiLanguage must be one of: en, de, zh, es, ja, fr" } });
+    res.status(422).json({ ok: false, error: { code: "validation_error", message: "uiLanguage must be one of: en, ko, ja, zh, de, es, fr" } });
     return;
   }
   try {

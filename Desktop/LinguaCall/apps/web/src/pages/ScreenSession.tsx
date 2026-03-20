@@ -83,12 +83,13 @@ export default function ScreenSession() {
   const { clerkUserId, clearIdentity } = useUser();
   const navigate = useNavigate();
 
+  type TopicOption = { value: string; labelKey: string };
   type LangExamConfig = {
     exam: string;
     defaultLevel: string;
     defaultTopic: string;
     levelOptions: string[];
-    topicOptions: string[];
+    topicOptions: TopicOption[];
   };
 
   const LANG_CONFIGS: Record<string, LangExamConfig> = {
@@ -97,42 +98,88 @@ export default function ScreenSession() {
       defaultLevel: 'IM3',
       defaultTopic: 'daily conversation',
       levelOptions: ['NL', 'NM', 'NH', 'IL', 'IM1', 'IM2', 'IM3', 'IH', 'AL'],
-      topicOptions: ['daily conversation', 'travel', 'work & career', 'technology', 'environment', 'health', 'education']
+      topicOptions: [
+        { value: 'daily conversation', labelKey: 'en_daily' },
+        { value: 'travel', labelKey: 'en_travel' },
+        { value: 'work & career', labelKey: 'en_work' },
+        { value: 'technology', labelKey: 'en_tech' },
+        { value: 'environment', labelKey: 'en_environment' },
+        { value: 'health', labelKey: 'en_health' },
+        { value: 'education', labelKey: 'en_education' }
+      ]
     },
     de: {
       exam: 'goethe_b2',
       defaultLevel: 'B1',
       defaultTopic: 'Studium und Beruf',
       levelOptions: ['A2', 'B1', 'B2'],
-      topicOptions: ['Studium und Beruf', 'Gesellschaft und Kultur', 'Umwelt und Natur', 'Gesundheit', 'Reisen', 'Technik und Medien', 'Kunst und Literatur']
+      topicOptions: [
+        { value: 'Studium und Beruf', labelKey: 'de_study' },
+        { value: 'Gesellschaft und Kultur', labelKey: 'de_society' },
+        { value: 'Umwelt und Natur', labelKey: 'de_environment' },
+        { value: 'Gesundheit', labelKey: 'de_health' },
+        { value: 'Reisen', labelKey: 'de_travel' },
+        { value: 'Technik und Medien', labelKey: 'de_tech' },
+        { value: 'Kunst und Literatur', labelKey: 'de_art' }
+      ]
     },
     zh: {
       exam: 'hsk5',
       defaultLevel: 'HSK4',
       defaultTopic: '工作与职业',
       levelOptions: ['HSK3', 'HSK4', 'HSK5'],
-      topicOptions: ['工作与职业', '文化与社会', '科技与创新', '环境与自然', '旅行与生活', '教育与学习']
+      topicOptions: [
+        { value: '工作与职业', labelKey: 'zh_work' },
+        { value: '文化与社会', labelKey: 'zh_culture' },
+        { value: '科技与创新', labelKey: 'zh_tech' },
+        { value: '环境与自然', labelKey: 'zh_environment' },
+        { value: '旅行与生活', labelKey: 'zh_travel' },
+        { value: '教育与学习', labelKey: 'zh_education' }
+      ]
     },
     es: {
       exam: 'dele_b1',
       defaultLevel: 'A2',
       defaultTopic: 'vida cotidiana',
       levelOptions: ['A1', 'A2', 'B1'],
-      topicOptions: ['vida cotidiana', 'viajes y turismo', 'trabajo y profesión', 'cultura y sociedad', 'salud', 'tecnología']
+      topicOptions: [
+        { value: 'vida cotidiana', labelKey: 'es_daily' },
+        { value: 'viajes y turismo', labelKey: 'es_travel' },
+        { value: 'trabajo y profesión', labelKey: 'es_work' },
+        { value: 'cultura y sociedad', labelKey: 'es_culture' },
+        { value: 'salud', labelKey: 'es_health' },
+        { value: 'tecnología', labelKey: 'es_tech' }
+      ]
     },
     ja: {
       exam: 'jlpt_n2',
       defaultLevel: 'N3',
       defaultTopic: '仕事と日常生活',
       levelOptions: ['N4', 'N3', 'N2', 'N1'],
-      topicOptions: ['仕事と日常生活', '旅行と観光', '社会と文化', '技術と革新', '環境と自然', '教育と学習', '健康と生活']
+      topicOptions: [
+        { value: '仕事と日常生活', labelKey: 'ja_work' },
+        { value: '旅行と観光', labelKey: 'ja_travel' },
+        { value: '社会と文化', labelKey: 'ja_society' },
+        { value: '技術と革新', labelKey: 'ja_tech' },
+        { value: '環境と自然', labelKey: 'ja_environment' },
+        { value: '教育と学習', labelKey: 'ja_education' },
+        { value: '健康と生活', labelKey: 'ja_health' }
+      ]
     },
     fr: {
       exam: 'delf_b1',
       defaultLevel: 'A2',
       defaultTopic: 'vie quotidienne',
       levelOptions: ['A1', 'A2', 'B1'],
-      topicOptions: ['vie quotidienne', 'voyages et tourisme', 'travail et carrière', 'culture et société', 'santé', 'technologie', 'environnement']
+      topicOptions: [
+        { value: 'vie quotidienne', labelKey: 'fr_daily' },
+        { value: 'voyages et tourisme', labelKey: 'fr_travel' },
+        { value: 'travail et carrière', labelKey: 'fr_work' },
+        { value: 'culture et société', labelKey: 'fr_culture' },
+        { value: 'santé', labelKey: 'fr_health' },
+        { value: 'technologie', labelKey: 'fr_tech' },
+        { value: 'environnement', labelKey: 'fr_environment' }
+      ]
     }
   };
 
@@ -543,8 +590,10 @@ export default function ScreenSession() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {LANG_CONFIGS[language].topicOptions.map(t => (
-                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                      {LANG_CONFIGS[language].topicOptions.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {t(`session.topicLabels.${opt.labelKey}`)}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

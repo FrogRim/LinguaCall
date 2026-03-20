@@ -6,13 +6,15 @@ import zh from "./locales/zh.json";
 import es from "./locales/es.json";
 import ja from "./locales/ja.json";
 import fr from "./locales/fr.json";
+import ko from "./locales/ko.json";
 
 export const SUPPORTED_UI_LANGUAGES = [
   { code: "en", flag: "🇺🇸", label: "English" },
-  { code: "de", flag: "🇩🇪", label: "Deutsch" },
-  { code: "zh", flag: "🇨🇳", label: "中文" },
-  { code: "es", flag: "🇪🇸", label: "Español" },
+  { code: "ko", flag: "🇰🇷", label: "한국어" },
   { code: "ja", flag: "🇯🇵", label: "日本語" },
+  { code: "zh", flag: "🇨🇳", label: "中文" },
+  { code: "de", flag: "🇩🇪", label: "Deutsch" },
+  { code: "es", flag: "🇪🇸", label: "Español" },
   { code: "fr", flag: "🇫🇷", label: "Français" },
 ] as const;
 
@@ -32,7 +34,7 @@ export function setCachedUiLanguage(code: UiLanguageCode) {
 }
 
 i18n.use(initReactI18next).init({
-  resources: { en: { translation: en }, de: { translation: de }, zh: { translation: zh }, es: { translation: es }, ja: { translation: ja }, fr: { translation: fr } },
+  resources: { en: { translation: en }, ko: { translation: ko }, ja: { translation: ja }, zh: { translation: zh }, de: { translation: de }, es: { translation: es }, fr: { translation: fr } },
   lng: getCachedUiLanguage(),
   fallbackLng: "en",
   interpolation: { escapeValue: false },
