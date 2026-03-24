@@ -9,10 +9,11 @@ import { Label } from '../components/ui/label';
 import { ArrowRight, ChevronLeft } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { apiClient, describeApiError } from '../lib/api';
+import { completeVerifiedSession } from '../features/auth/verifyFlow';
 
 export default function ScreenVerify() {
   const { t } = useTranslation();
-  const { getToken } = useUser();
+  const { getToken, refreshSession } = useUser();
   const navigate = useNavigate();
   const [phone, setPhone] = useState('+8210');
   const [otp, setOtp] = useState('');
@@ -45,7 +46,10 @@ export default function ScreenVerify() {
     setError('');
     try {
       await api.post<{ userId: string; sessionId: string }>('/auth/otp/verify', { phone, code: otp });
-      navigate('/session');
+      await completeVerifiedSession({
+        refreshSession,
+        navigate
+      });
     } catch (err) {
       setError(describeApiError(err, 'phone_confirm'));
     } finally {
