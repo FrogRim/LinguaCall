@@ -18,6 +18,10 @@ import {
   type WebVoiceClientController,
   type WebVoiceClientState
 } from '../lib/webVoiceClient';
+import {
+  attachOrDisposeResolvedController,
+  planLiveSessionEnd
+} from '../features/session/liveSession';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -335,12 +339,15 @@ export default function ScreenSession() {
         }
       });
 
-      if (activeRef.current && activeRef.current.sessionId === sessionId) {
-        syncActive({
-          ...activeRef.current,
-          controller,
-          note: 'Waiting for OpenAI Realtime connection...'
-        });
+      const resolution = await attachOrDisposeResolvedController({
+        activeSession: activeRef.current,
+        sessionId,
+        controller,
+        connectedNote: 'Waiting for OpenAI Realtime connection...'
+      });
+
+      if (resolution.kind === 'attached') {
+        syncActive(resolution.nextActiveSession);
       }
     } catch (error) {
       syncActive(null);
@@ -451,11 +458,33 @@ export default function ScreenSession() {
   };
 
   const handleEndCall = async (sessionId: string) => {
-    if (activeRef.current?.sessionId === sessionId && activeRef.current.controller) {
-      await activeRef.current.controller.end();
+    const api = makeApi();
+    const activePlan = planLiveSessionEnd(
+      activeRef.current,
+      sessionId,
+      t('session.endCall')
+    );
+
+    if (activePlan.nextActiveSession !== activeRef.current) {
+      syncActive(activePlan.nextActiveSession as ActiveWebVoiceSession | null);
+    }
+
+    if (activePlan.kind === 'controller') {
+      try {
+        await activePlan.nextActiveSession.controller?.end();
+      } catch (err) {
+        syncActive(null);
+        try {
+          await api.post<Session>(`/calls/${sessionId}/end`, {});
+          setGlobalMessage('call ended. Report generation may follow shortly.');
+        } catch (fallbackErr) {
+          setGlobalMessage(`end failed: ${describeApiError(fallbackErr, 'call_end')}`);
+        }
+        await loadSessions();
+      }
       return;
     }
-    const api = makeApi();
+
     try {
       await api.post<Session>(`/calls/${sessionId}/end`, {});
       setGlobalMessage('call ended. Report generation may follow shortly.');
@@ -520,11 +549,7 @@ export default function ScreenSession() {
                 <Button
                   variant="destructive"
                   size="sm"
-                  onClick={async () => {
-                    if (!activeRef.current?.controller) return;
-                    syncActive({ ...activeRef.current, state: 'ending', note: t('session.endCall') });
-                    await activeRef.current.controller.end();
-                  }}
+                  onClick={() => void handleEndCall(activeSession.sessionId)}
                 >
                   {t('session.endCall')}
                 </Button>

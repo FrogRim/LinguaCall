@@ -141,6 +141,7 @@ export const startWebVoiceClient = async ({
     }
     finalized = true;
     onStateChange?.("ending", "Finishing live session...");
+    let completionFailed = false;
     try {
       await completeRuntime(apiBase, bootstrap.sessionId, headers, {
         ...payload,
@@ -151,8 +152,19 @@ export const startWebVoiceClient = async ({
         },
         transcript: [...transcript]
       });
-      onStateChange?.(nextState, nextState === "ended" ? "Live session ended." : "Live session failed.");
+    } catch {
+      completionFailed = true;
     } finally {
+      onStateChange?.(
+        nextState,
+        completionFailed
+          ? nextState === "ended"
+            ? "Live session ended locally. Server sync may still be catching up."
+            : "Live session failed. Server sync may still be catching up."
+          : nextState === "ended"
+            ? "Live session ended."
+            : "Live session failed."
+      );
       stream.getTracks().forEach((track) => track.stop());
       peer.close();
       remoteAudio.remove();
