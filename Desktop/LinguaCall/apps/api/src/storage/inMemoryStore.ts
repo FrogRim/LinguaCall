@@ -2042,6 +2042,94 @@ class InMemoryStore {
       }
 
       const providerCallSid = isTwilioCallSid(session.provider_call_sid) ? session.provider_call_sid : undefined;
+      const isWebVoiceSession = !providerCallSid && session.call_id?.startsWith("WV_");
+
+      if (isWebVoiceSession && session.status === "connecting") {
+        if (session.reserved_trial_call || session.reserved_minutes > 0) {
+          await this.releaseScheduledAllowance(client, session.user_id, session, "web voice session cancelled before connect");
+        }
+
+        const cancelled = await client.query<DbSessionRow>(
+          `
+            UPDATE sessions
+            SET status = 'cancelled',
+                failure_reason = NULL,
+                reserved_trial_call = false,
+                reserved_minutes = 0,
+                ended_at = COALESCE(ended_at, NOW()),
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+          `,
+          [session.id]
+        );
+        if (cancelled.rows.length === 0) {
+          throw new AppError(DB_ERROR.SESSION_NOT_FOUND, "session not found");
+        }
+
+        await this.writeWebhookEvent(
+          client,
+          "media",
+          this.getWebhookDedupeKey("media", "web_voice_end", `cancel:${cancelled.rows[0].id}:${Date.now()}`),
+          {
+            event: "app_end_call",
+            sessionId: cancelled.rows[0].id,
+            status: "cancelled",
+            providerCallSid: session.provider_call_sid,
+            callId: session.call_id,
+            at: nowIso()
+          },
+          "web_voice"
+        );
+
+        await client.query("COMMIT");
+        return this.mapSession(cancelled.rows[0]);
+      }
+
+      if (isWebVoiceSession && (session.status === "in_progress" || session.status === "ending")) {
+        if (session.reserved_trial_call || session.reserved_minutes > 0) {
+          await this.commitScheduledAllowance(client, session.user_id, session, "user ended web voice call");
+        }
+
+        const completed = await client.query<DbSessionRow>(
+          `
+            UPDATE sessions
+            SET status = 'completed',
+                failure_reason = NULL,
+                reserved_trial_call = false,
+                reserved_minutes = 0,
+                answered_at = COALESCE(answered_at, NOW()),
+                completed_at = COALESCE(completed_at, NOW()),
+                ended_at = COALESCE(ended_at, NOW()),
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+          `,
+          [session.id]
+        );
+        if (completed.rows.length === 0) {
+          throw new AppError(DB_ERROR.SESSION_NOT_FOUND, "session not found");
+        }
+
+        await this.writeWebhookEvent(
+          client,
+          "media",
+          this.getWebhookDedupeKey("media", "web_voice_end", `complete:${completed.rows[0].id}:${Date.now()}`),
+          {
+            event: "app_end_call",
+            sessionId: completed.rows[0].id,
+            status: "completed",
+            providerCallSid: session.provider_call_sid,
+            callId: session.call_id,
+            at: nowIso()
+          },
+          "web_voice"
+        );
+
+        await client.query("COMMIT");
+        return this.mapSession(completed.rows[0]);
+      }
+
       if (providerCallSid) {
         const endResult = await endOutboundCall(providerCallSid);
         if (endResult.status === "failed") {
@@ -2107,6 +2195,11 @@ class InMemoryStore {
       if (error instanceof AppError) {
         throw error;
       }
+      console.error("endSessionCall failed", {
+        callOrSessionId,
+        clerkUserId,
+        error
+      });
       throw new AppError("internal_error", "failed_to_end_call");
     } finally {
       client.release();
@@ -4326,10 +4419,12 @@ class InMemoryStore {
     }
   }
 
-  getWebhookDedupeKey(provider: "twilio" | "kakao" | "telegram" | "payments", eventType: string, providerEventId: string) {
+  getWebhookDedupeKey(provider: "twilio" | "kakao" | "telegram" | "payments" | "media" | "media_stream", eventType: string, providerEventId: string) {
     if (provider === "twilio") return `twilio:${eventType}:${providerEventId}`;
     if (provider === "kakao") return `kakao:${eventType}:${providerEventId}`;
     if (provider === "telegram") return `telegram:${eventType}:${providerEventId}`;
+    if (provider === "media") return `media:${eventType}:${providerEventId}`;
+    if (provider === "media_stream") return `media_stream:${eventType}:${providerEventId}`;
     return `payments:${eventType}:${providerEventId}`;
   }
 }
