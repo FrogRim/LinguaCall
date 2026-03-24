@@ -1994,7 +1994,7 @@ class InMemoryStore {
         SELECT s.*
         FROM sessions s
         WHERE s.user_id = $2
-          AND (s.id = $1 OR s.call_id = $1 OR s.public_id = $1 OR s.provider_call_sid = $1)
+          AND (s.id::text = $1 OR s.call_id = $1 OR s.public_id = $1 OR s.provider_call_sid = $1)
         LIMIT 1
       `,
       [identifier, user.id]
@@ -2016,7 +2016,7 @@ class InMemoryStore {
           SELECT *
           FROM sessions s
           WHERE s.user_id = $2
-            AND (s.id = $1 OR s.call_id = $1 OR s.public_id = $1 OR s.provider_call_sid = $1)
+            AND (s.id::text = $1 OR s.call_id = $1 OR s.public_id = $1 OR s.provider_call_sid = $1)
           FOR UPDATE
         `,
         [callOrSessionId, user.id]
