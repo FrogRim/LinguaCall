@@ -2,7 +2,7 @@ import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { createAuthRouter } from "../modules/auth/routes";
-import { issueAccessToken } from "../modules/auth/session";
+import { hashToken, issueAccessToken } from "../modules/auth/session";
 import type { AuthRepository, OtpSmsSender } from "../modules/auth/service";
 
 const accessTokenSecret = "route-test-secret";
@@ -40,6 +40,23 @@ const createRepo = (): AuthRepository => {
       return {
         id: "session-1"
       };
+    },
+    async findAuthSessionByRefreshTokenHash(refreshTokenHash) {
+      if (refreshTokenHash === hashToken("refresh-token")) {
+        return {
+          id: "session-1",
+          userId: "user-1",
+          refreshTokenHash,
+          expiresAt: "2099-03-23T01:00:00.000Z"
+        };
+      }
+      return undefined;
+    },
+    async rotateAuthSessionRefreshToken() {
+      return;
+    },
+    async revokeAuthSessionByRefreshTokenHash() {
+      return;
     }
   };
 };
@@ -104,6 +121,35 @@ describe("createAuthRouter", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers["set-cookie"]).toBeDefined();
+    const setCookie = response.headers["set-cookie"];
+    const cookieHeader = Array.isArray(setCookie) ? setCookie.join(";") : String(setCookie);
+    expect(cookieHeader).toContain("lc_access=");
+    expect(cookieHeader).toContain("lc_refresh=");
+  });
+
+  it("reissues auth cookies from a refresh cookie", async () => {
+    const app = express();
+    app.use(express.json());
+    const smsSender: OtpSmsSender = {
+      async sendOtp() {
+        return;
+      }
+    };
+    app.use(
+      "/auth",
+      createAuthRouter({
+        repo: createRepo(),
+        smsSender,
+        accessTokenSecret
+      })
+    );
+
+    const response = await request(app)
+      .post("/auth/refresh")
+      .set("Cookie", ["lc_refresh=refresh-token"]);
+
+    expect(response.status).toBe(200);
+    expect(response.body.ok).toBe(true);
     const setCookie = response.headers["set-cookie"];
     const cookieHeader = Array.isArray(setCookie) ? setCookie.join(";") : String(setCookie);
     expect(cookieHeader).toContain("lc_access=");

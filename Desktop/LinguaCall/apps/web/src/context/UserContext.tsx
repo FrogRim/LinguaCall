@@ -23,6 +23,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const refreshSession = useCallback(async () => {
     try {
+      await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include'
+      }).catch(() => null);
       const res = await fetch(`${API_BASE}/auth/me`, {
         credentials: 'include'
       });

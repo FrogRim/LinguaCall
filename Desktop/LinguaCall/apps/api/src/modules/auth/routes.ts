@@ -166,7 +166,48 @@ export const createAuthRouter = (options: CreateAuthRouterOptions = {}) => {
     });
   });
 
-  router.post("/logout", async (_req: Request, res: Response) => {
+  router.post("/refresh", async (req: Request, res: Response) => {
+    const refreshToken = readCookie(req.headers.cookie, "lc_refresh");
+    if (!refreshToken) {
+      res.status(401).json({
+        ok: false,
+        error: { code: "forbidden", message: "refresh session required" }
+      });
+      return;
+    }
+
+    try {
+      const result = await authService.refreshSession({
+        refreshToken,
+        userAgent: req.get("user-agent") ?? undefined,
+        ip: req.ip
+      });
+      setAuthCookies(res, {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken
+      });
+      res.json({
+        ok: true,
+        data: {
+          userId: result.user.id,
+          sessionId: result.sessionId
+        }
+      });
+    } catch (error) {
+      clearAuthCookies(res);
+      res.status(401).json({
+        ok: false,
+        error: {
+          code: "forbidden",
+          message: error instanceof Error ? error.message : "failed_to_refresh_session"
+        }
+      });
+    }
+  });
+
+  router.post("/logout", async (req: Request, res: Response) => {
+    const refreshToken = readCookie(req.headers.cookie, "lc_refresh");
+    await authService.logout(refreshToken);
     clearAuthCookies(res);
     res.json({
       ok: true,

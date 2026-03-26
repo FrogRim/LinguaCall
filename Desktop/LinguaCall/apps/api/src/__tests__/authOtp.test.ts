@@ -54,6 +54,15 @@ const createRepo = () => {
       return {
         id: "session-1"
       };
+    },
+    async findAuthSessionByRefreshTokenHash() {
+      return undefined;
+    },
+    async rotateAuthSessionRefreshToken() {
+      return;
+    },
+    async revokeAuthSessionByRefreshTokenHash() {
+      return;
     }
   };
 

@@ -30,6 +30,18 @@ export function describeApiError(error: unknown, context: string): string {
 }
 
 export function apiClient(getToken: () => Promise<string | null>) {
+  const refreshAuthSession = async () => {
+    const res = await fetch(`${API_BASE}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const payload = (await res.json()) as ApiResponse<{ userId: string; sessionId: string }>;
+    return Boolean(res.ok && payload.ok);
+  };
+
   const h = async (): Promise<Record<string, string>> => {
     const token = await getToken();
     return {
@@ -38,44 +50,48 @@ export function apiClient(getToken: () => Promise<string | null>) {
     };
   };
 
-  async function post<T>(url: string, body: object): Promise<T> {
-    const res = await fetch(`${API_BASE}${url}`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: await h(),
-      body: JSON.stringify(body)
-    });
-    const payload = (await res.json()) as ApiResponse<T>;
-    if (!payload.ok || !payload.data) {
-      throw payload.error ?? ({ code: 'validation_error', message: 'api_error' } as ApiError);
-    }
-    return payload.data;
-  }
-
-  async function patch<T>(url: string, body: object): Promise<T> {
-    const res = await fetch(`${API_BASE}${url}`, {
-      method: 'PATCH',
-      credentials: 'include',
-      headers: await h(),
-      body: JSON.stringify(body)
-    });
-    const payload = (await res.json()) as ApiResponse<T>;
-    if (!payload.ok || !payload.data) {
-      throw payload.error ?? ({ code: 'validation_error', message: 'api_error' } as ApiError);
-    }
-    return payload.data;
-  }
-
-  async function get<T>(url: string): Promise<T> {
+  async function request<T>(
+    url: string,
+    init: RequestInit,
+    allowRefresh = true
+  ): Promise<T> {
     const res = await fetch(`${API_BASE}${url}`, {
       credentials: 'include',
+      ...init,
       headers: await h()
     });
     const payload = (await res.json()) as ApiResponse<T>;
-    if (!payload.ok) {
+
+    if (res.status === 401 && allowRefresh && url !== '/auth/refresh') {
+      const refreshed = await refreshAuthSession().catch(() => false);
+      if (refreshed) {
+        return request<T>(url, init, false);
+      }
+    }
+
+    if (!payload.ok || (!payload.data && res.status !== 204)) {
       throw payload.error ?? ({ code: 'validation_error', message: 'api_error' } as ApiError);
     }
+
     return payload.data as T;
+  }
+
+  async function post<T>(url: string, body: object): Promise<T> {
+    return request<T>(url, {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+  }
+
+  async function patch<T>(url: string, body: object): Promise<T> {
+    return request<T>(url, {
+      method: 'PATCH',
+      body: JSON.stringify(body)
+    });
+  }
+
+  async function get<T>(url: string): Promise<T> {
+    return request<T>(url, {});
   }
 
   return { post, patch, get, headers: h, base: API_BASE };

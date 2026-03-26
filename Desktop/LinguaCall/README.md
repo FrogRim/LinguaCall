@@ -2,6 +2,19 @@
 
 Real-time AI conversation practice for language exam preparation.
 
+## What This Repo Is Now
+
+LinguaCall is now a Korean-market MVP that has already been cut over to a self-hosted launch stack.
+
+- auth: phone OTP with SOLAPI SMS
+- session auth: app-managed `httpOnly` cookie sessions
+- billing: Toss only
+- runtime: browser-direct OpenAI Realtime voice over WebRTC
+- database: Supabase Postgres only
+- deploy: VPS self-hosted `web + api + worker + caddy`
+
+This means the active product path no longer depends on Clerk, Stripe, Railway, Vercel, Naver SMS, or Sentry.
+
 ## Current Launch Direction
 
 - auth: phone OTP + app-managed session cookies
@@ -11,6 +24,46 @@ Real-time AI conversation practice for language exam preparation.
 - deploy: self-hosted `web + api + worker` on a VPS
 
 This repository is being hardened toward a Korean-market launch first. Historical references to Clerk, Stripe, Railway, Vercel, and Sentry should be treated as archival unless explicitly marked otherwise.
+
+## Launch Status
+
+The current MVP launch path is complete enough to run real user tests.
+
+- deployed on a VPS with Docker Compose
+- HTTPS terminated by Caddy
+- phone OTP login working with SOLAPI
+- returning users can stay signed in on the same device via refresh-cookie sessions
+- Toss sandbox billing working
+- session creation working
+- realtime voice session bootstrapping working
+- worker-based async report processing wired in
+
+Remaining work should be treated as launch hardening and product iteration, not core-stack migration.
+
+## What Was Changed
+
+The project was materially simplified from its earlier SaaS-heavy setup.
+
+- removed Clerk from the active runtime path
+- replaced Naver SMS with SOLAPI
+- narrowed billing from multi-provider to Toss only
+- moved background loops out of the API process into a dedicated worker
+- moved deployment from Railway/Vercel assumptions to VPS self-hosting
+- removed Sentry from the active bootstrap path
+- rewired the web app to cookie-session auth instead of bearer tokens from Clerk
+
+## What Is Archival
+
+You may still see historical references in old docs or older code paths. For the active launch path, treat these as archival:
+
+- Clerk
+- Stripe
+- Railway
+- Vercel
+- Naver SMS
+- Sentry
+
+If a document conflicts with the sections above, prefer this README plus the runbooks listed in `Source Of Truth`.
 
 ## Architecture
 

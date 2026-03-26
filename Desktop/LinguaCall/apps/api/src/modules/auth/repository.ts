@@ -145,6 +145,60 @@ export const createPgAuthRepository = (pool: Pool): AuthRepository => {
         ]
       );
       return { id };
+    },
+
+    async findAuthSessionByRefreshTokenHash(refreshTokenHash) {
+      const result = await pool.query<{
+        id: string;
+        user_id: string;
+        refresh_token_hash: string;
+        expires_at: string;
+        revoked_at: string | null;
+      }>(
+        `SELECT id, user_id, refresh_token_hash, expires_at, revoked_at
+         FROM auth_sessions
+         WHERE refresh_token_hash = $1
+         LIMIT 1`,
+        [refreshTokenHash]
+      );
+      if (!result.rows.length) {
+        return undefined;
+      }
+      const row = result.rows[0];
+      return {
+        id: row.id,
+        userId: row.user_id,
+        refreshTokenHash: row.refresh_token_hash,
+        expiresAt: row.expires_at,
+        revokedAt: row.revoked_at ?? undefined
+      };
+    },
+
+    async rotateAuthSessionRefreshToken(input) {
+      await pool.query(
+        `UPDATE auth_sessions
+         SET refresh_token_hash = $2,
+             expires_at = $3,
+             ip = $4,
+             user_agent = $5
+         WHERE id = $1`,
+        [
+          input.sessionId,
+          input.refreshTokenHash,
+          input.expiresAt,
+          input.ip ?? null,
+          input.userAgent ?? null
+        ]
+      );
+    },
+
+    async revokeAuthSessionByRefreshTokenHash(refreshTokenHash) {
+      await pool.query(
+        `UPDATE auth_sessions
+         SET revoked_at = NOW()
+         WHERE refresh_token_hash = $1 AND revoked_at IS NULL`,
+        [refreshTokenHash]
+      );
     }
   };
 };

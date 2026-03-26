@@ -22,6 +22,14 @@ export interface CreateAuthSessionInput {
   ip?: string;
 }
 
+export interface AuthSessionRecord {
+  id: string;
+  userId: string;
+  refreshTokenHash: string;
+  expiresAt: string;
+  revokedAt?: string;
+}
+
 export interface AuthRepository {
   replaceOtpChallenge(input: {
     phoneE164: string;
@@ -35,6 +43,9 @@ export interface AuthRepository {
   findUserById(userId: string): Promise<AuthUserRecord | undefined>;
   createUserForPhone(phoneE164: string): Promise<AuthUserRecord>;
   createAuthSession(input: CreateAuthSessionInput): Promise<{ id: string }>;
+  findAuthSessionByRefreshTokenHash(refreshTokenHash: string): Promise<AuthSessionRecord | undefined>;
+  rotateAuthSessionRefreshToken(input: CreateAuthSessionInput & { sessionId: string }): Promise<void>;
+  revokeAuthSessionByRefreshTokenHash(refreshTokenHash: string): Promise<void>;
 }
 
 export interface OtpSmsSender {
@@ -82,6 +93,37 @@ export const createAuthService = ({
   generateToken = () => crypto.randomUUID(),
   accessTokenSecret = process.env.SESSION_COOKIE_SECRET ?? "dev-session-secret"
 }: CreateAuthServiceOptions) => {
+  const issueSessionTokens = async (input: {
+    user: AuthUserRecord;
+    sessionId: string;
+    refreshToken: string;
+    nowDate?: Date;
+  }) => {
+    const current = input.nowDate ?? now();
+    const refreshExpiresAt = new Date(
+      current.getTime() + 30 * 24 * 60 * 60 * 1000
+    ).toISOString();
+    const accessExpiresAt = new Date(
+      current.getTime() + 60 * 60 * 1000
+    ).toISOString();
+
+    return {
+      user: input.user,
+      sessionId: input.sessionId,
+      refreshToken: input.refreshToken,
+      accessToken: issueAccessToken(
+        {
+          userId: input.user.id,
+          sessionId: input.sessionId,
+          expiresAt: accessExpiresAt
+        },
+        accessTokenSecret
+      ),
+      accessExpiresAt,
+      refreshExpiresAt
+    };
+  };
+
   return {
     async startOtp(phone: string) {
       const phoneE164 = normalizePhoneE164(phone);
@@ -132,8 +174,9 @@ export const createAuthService = ({
 
       const refreshToken = generateToken();
       const refreshTokenHash = hashToken(refreshToken);
+      const current = now();
       const refreshExpiresAt = new Date(
-        now().getTime() + 30 * 24 * 60 * 60 * 1000
+        current.getTime() + 30 * 24 * 60 * 60 * 1000
       ).toISOString();
       const session = await repo.createAuthSession({
         userId: user.id,
@@ -142,25 +185,12 @@ export const createAuthService = ({
         userAgent: input.userAgent,
         ip: input.ip
       });
-      const accessExpiresAt = new Date(
-        now().getTime() + 60 * 60 * 1000
-      ).toISOString();
-
-      return {
+      return issueSessionTokens({
         user,
         sessionId: session.id,
         refreshToken,
-        accessToken: issueAccessToken(
-          {
-            userId: user.id,
-            sessionId: session.id,
-            expiresAt: accessExpiresAt
-          },
-          accessTokenSecret
-        ),
-        accessExpiresAt,
-        refreshExpiresAt
-      };
+        nowDate: current
+      });
     },
 
     async getCurrentUser(accessToken: string) {
@@ -176,6 +206,51 @@ export const createAuthService = ({
         user,
         sessionId: payload.sessionId
       };
+    },
+
+    async refreshSession(input: {
+      refreshToken: string;
+      userAgent?: string;
+      ip?: string;
+    }) {
+      const refreshTokenHash = hashToken(input.refreshToken);
+      const session = await repo.findAuthSessionByRefreshTokenHash(refreshTokenHash);
+      if (!session || session.revokedAt || Date.parse(session.expiresAt) <= Date.now()) {
+        throw new Error("invalid_refresh_session");
+      }
+
+      const user = await repo.findUserById(session.userId);
+      if (!user) {
+        throw new Error("invalid_refresh_session");
+      }
+
+      const nextRefreshToken = generateToken();
+      const current = now();
+      const nextRefreshExpiresAt = new Date(
+        current.getTime() + 30 * 24 * 60 * 60 * 1000
+      ).toISOString();
+      await repo.rotateAuthSessionRefreshToken({
+        sessionId: session.id,
+        userId: session.userId,
+        refreshTokenHash: hashToken(nextRefreshToken),
+        expiresAt: nextRefreshExpiresAt,
+        userAgent: input.userAgent,
+        ip: input.ip
+      });
+
+      return issueSessionTokens({
+        user,
+        sessionId: session.id,
+        refreshToken: nextRefreshToken,
+        nowDate: current
+      });
+    },
+
+    async logout(refreshToken?: string) {
+      if (!refreshToken) {
+        return;
+      }
+      await repo.revokeAuthSessionByRefreshTokenHash(hashToken(refreshToken));
     }
   };
 };
