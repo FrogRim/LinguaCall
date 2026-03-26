@@ -6,7 +6,7 @@ const readEnv = (value?: string): string | undefined => {
 };
 
 const asRecord = (value: unknown): Record<string, unknown> | undefined => {
-  return value && typeof value === "object" ? value as Record<string, unknown> : undefined;
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
 };
 
 const readStringValue = (...candidates: unknown[]): string | undefined => {
@@ -65,6 +65,7 @@ const buildGermanInstructions = (input: CreateOpenAIRealtimeSessionInput) => {
   const parts = [
     "Du bist LinguaCall, ein Sprachpartner fuer die Goethe-Zertifikat-B2-Sprechpruefung.",
     "Fuehre das Gespraech ausschliesslich auf Deutsch.",
+    "Beginne die Sitzung mit dem ersten Satz auf Deutsch.",
     "Bleibe beim aktuellen Thema und wechsle das Thema nur, wenn der Lernende das ausdruecklich verlangt.",
     `Thema der Sitzung: ${topic}.`,
     `Sprachniveau des Lernenden: ${level}, Ziel Goethe B2.`,
@@ -85,18 +86,28 @@ const buildGermanInstructions = (input: CreateOpenAIRealtimeSessionInput) => {
 };
 
 const buildChineseInstructions = (input: CreateOpenAIRealtimeSessionInput) => {
-  const { topic, level, durationMinutes } = input;
-  return [
-    "?�� LinguaCall������?��� HSK 5 Ϣ???������???�ᡣ",
-    "?������������?��",
-    "���?���?���ު??��٥?�ϴ??��",
-    `���??�?��${topic}��`,
-    `??�������${level}����? HSK 5��`,
-    `????��${durationMinutes} ��?��`,
-    "?ۯط?�ܣ�����?ӭϣ������ϣ?��?׺����??ӭ����?��",
-    "�����?��??��?��????��????��?��?ӭ?٥??��������?��",
-    "������?�ң�?���?�������?��"
-  ].join(" ");
+  const { topic, level, durationMinutes, accuracyPolicy } = input;
+  const parts = [
+    "You are LinguaCall, a live Mandarin Chinese speaking practice partner for HSK 5 preparation.",
+    "Conduct the entire conversation only in Mandarin Chinese.",
+    "Open the session with the first sentence in Mandarin Chinese.",
+    "Stay on the current topic unless the learner explicitly asks to change it.",
+    `Session topic: ${topic}.`,
+    `Learner level: ${level}, target HSK 5.`,
+    `Session duration: ${durationMinutes} minutes.`,
+    `Use at most ${accuracyPolicy?.maxAssistantSentences ?? 3} short sentences per turn.`,
+    `Ask at most ${accuracyPolicy?.maxAssistantQuestionsPerTurn ?? 1} question per turn.`,
+    "Speak slightly slower than natural conversational speed and leave a short pause between sentences.",
+    "If you correct the learner, keep the correction short and directly tied to the learner's latest sentence.",
+    "If you are unsure, ask a short clarifying question instead of guessing."
+  ];
+  if (accuracyPolicy?.allowedSubtopicHints.length) {
+    parts.push(`Prefer these subtopic cues when they fit: ${accuracyPolicy.allowedSubtopicHints.join(", ")}.`);
+  }
+  if (accuracyPolicy?.forbiddenDomainHints.length) {
+    parts.push(`Avoid drifting into unrelated domains such as: ${accuracyPolicy.forbiddenDomainHints.join(", ")}.`);
+  }
+  return parts.join(" ");
 };
 
 const buildSpanishInstructions = (input: CreateOpenAIRealtimeSessionInput) => {
@@ -104,6 +115,7 @@ const buildSpanishInstructions = (input: CreateOpenAIRealtimeSessionInput) => {
   const parts = [
     "Eres LinguaCall, un companero de practica oral orientado al examen DELE B1.",
     "Manten toda la conversacion en espanol.",
+    "Empieza la sesion con la primera frase en espanol.",
     "Manten el tema actual y no cambies de tema salvo que el estudiante lo pida de forma explicita.",
     `Tema de la sesion: ${topic}.`,
     `Nivel del estudiante: ${level}, objetivo DELE B1.`,
@@ -127,6 +139,8 @@ const buildEnglishInstructions = (input: CreateOpenAIRealtimeSessionInput) => {
   const { topic, level, durationMinutes, accuracyPolicy } = input;
   const rules = [
     "You are LinguaCall, a live English speaking practice partner for OPIC preparation.",
+    "Conduct the entire conversation only in English.",
+    "Open the session with the first sentence in English.",
     `Keep the learner on the current topic: ${topic}.`,
     `Target learner level: ${level}.`,
     `Target session duration: ${durationMinutes} minutes.`,
@@ -151,23 +165,24 @@ const buildEnglishInstructions = (input: CreateOpenAIRealtimeSessionInput) => {
 const buildJapaneseInstructions = (input: CreateOpenAIRealtimeSessionInput) => {
   const { topic, level, durationMinutes, accuracyPolicy } = input;
   const parts = [
-    "あなたはLinguaCallです。JLPT N2の口頭試験練習をサポートするAI会話パートナーです。",
-    "会話はすべて日本語で行ってください。",
-    "現在のトピックから外れないようにし、学習者が明示的に変更を求めた場合のみトピックを変えてください。",
-    `セッションのトピック：${topic}。`,
-    `学習者のレベル：${level}、目標はJLPT N2合格です。`,
-    `セッションの時間：${durationMinutes}分。`,
-    `1回の返答は最大${accuracyPolicy?.maxAssistantSentences ?? 3}文以内にしてください。`,
-    `1回の返答で質問は最大${accuracyPolicy?.maxAssistantQuestionsPerTurn ?? 1}つまでにしてください。`,
-    "自然な会話速度よりやや遅めに話し、文と文の間に短い間を置いてください。",
-    "訂正する場合は、直前の学習者の発言に直接言及し、簡潔に行ってください。",
-    "不明な点があれば、推測せずに短い確認の質問をしてください。"
+    "You are LinguaCall, a live Japanese speaking practice partner for JLPT N2 preparation.",
+    "Conduct the entire conversation only in Japanese.",
+    "Open the session with the first sentence in Japanese.",
+    "Stay on the current topic unless the learner explicitly asks to change it.",
+    `Session topic: ${topic}.`,
+    `Learner level: ${level}, target JLPT N2.`,
+    `Session duration: ${durationMinutes} minutes.`,
+    `Use at most ${accuracyPolicy?.maxAssistantSentences ?? 3} short sentences per turn.`,
+    `Ask at most ${accuracyPolicy?.maxAssistantQuestionsPerTurn ?? 1} question per turn.`,
+    "Speak slightly slower than natural conversational speed and leave a short pause between sentences.",
+    "If you correct the learner, keep the correction short and directly tied to the learner's latest sentence.",
+    "If you are unsure, ask a short clarifying question instead of guessing."
   ];
   if (accuracyPolicy?.allowedSubtopicHints.length) {
-    parts.push(`適切な場合は以下のサブトピックを優先してください：${accuracyPolicy.allowedSubtopicHints.join("、")}。`);
+    parts.push(`Prefer these subtopic cues when they fit: ${accuracyPolicy.allowedSubtopicHints.join(", ")}.`);
   }
   if (accuracyPolicy?.forbiddenDomainHints.length) {
-    parts.push(`次のような無関係な話題への転換は避けてください：${accuracyPolicy.forbiddenDomainHints.join("、")}。`);
+    parts.push(`Avoid drifting into unrelated domains such as: ${accuracyPolicy.forbiddenDomainHints.join(", ")}.`);
   }
   return parts.join(" ");
 };
@@ -177,6 +192,7 @@ const buildFrenchInstructions = (input: CreateOpenAIRealtimeSessionInput) => {
   const parts = [
     "Tu es LinguaCall, un partenaire de pratique orale pour la preparation au DELF B1.",
     "Conduis toute la conversation en francais.",
+    "Commence la session avec la premiere phrase en francais.",
     "Reste sur le sujet actuel et ne changes de sujet que si l'apprenant le demande explicitement.",
     `Sujet de la session : ${topic}.`,
     `Niveau de l'apprenant : ${level}, objectif DELF B1.`,
@@ -266,7 +282,7 @@ export const createOpenAIRealtimeSession = async (
     throw new Error(`failed_to_create_realtime_session: ${response.status} ${text}`.trim());
   }
 
-  const payload = await response.json() as Record<string, unknown>;
+  const payload = (await response.json()) as Record<string, unknown>;
   const sessionPayload = asRecord(payload.session);
   const clientSecretPayload = asRecord(payload.client_secret) ?? asRecord(sessionPayload?.client_secret);
   const secretPayload = asRecord(payload.secret) ?? asRecord(sessionPayload?.secret);
@@ -309,11 +325,7 @@ export const createOpenAIRealtimeSession = async (
     sessionPayload?.expiresAt
   );
 
-  const resolvedModel = readStringValue(
-    payload.model,
-    sessionPayload?.model,
-    model
-  ) ?? model;
+  const resolvedModel = readStringValue(payload.model, sessionPayload?.model, model) ?? model;
 
   return {
     clientSecret: clientSecretValue,

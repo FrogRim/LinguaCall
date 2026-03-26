@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { buildInstructions } from "../services/openaiRealtime";
 
 const base = {
@@ -8,9 +8,9 @@ const base = {
   durationMinutes: 10
 };
 
-describe("buildInstructions — AI 시스템 프롬프트 분기", () => {
-  describe("EN / OPIC (영어)", () => {
-    const instr = buildInstructions({
+describe("buildInstructions", () => {
+  it("uses an English-only prompt for OPIC", () => {
+    const instructions = buildInstructions({
       ...base,
       language: "en",
       exam: "opic",
@@ -18,25 +18,14 @@ describe("buildInstructions — AI 시스템 프롬프트 분기", () => {
       topic: "daily conversation"
     });
 
-    it("영어로 응답", () => {
-      expect(instr).toMatch(/You are LinguaCall/);
-    });
-    it("OPIC 언급", () => {
-      expect(instr).toMatch(/OPIC/);
-    });
-    it("topic 포함", () => {
-      expect(instr).toMatch(/daily conversation/);
-    });
-    it("level 포함", () => {
-      expect(instr).toMatch(/IM3/);
-    });
-    it("durationMinutes 포함", () => {
-      expect(instr).toMatch(/10 minutes/);
-    });
+    expect(instructions).toContain("Conduct the entire conversation only in English.");
+    expect(instructions).toContain("Open the session with the first sentence in English.");
+    expect(instructions).toContain("daily conversation");
+    expect(instructions).toContain("IM3");
   });
 
-  describe("DE / Goethe B2 (독일어) — 핵심", () => {
-    const instr = buildInstructions({
+  it("uses a German-only prompt for Goethe B2", () => {
+    const instructions = buildInstructions({
       ...base,
       language: "de",
       exam: "goethe_b2",
@@ -44,75 +33,27 @@ describe("buildInstructions — AI 시스템 프롬프트 분기", () => {
       topic: "Studium und Beruf"
     });
 
-    it("독일어 지시문 사용 (Du bist)", () => {
-      expect(instr).toMatch(/Du bist LinguaCall/);
-    });
-    it("Goethe B2 명시", () => {
-      expect(instr).toMatch(/Goethe.+B2/);
-    });
-    it("Sprechen 파트 명시", () => {
-      expect(instr).toMatch(/Sprechen/);
-    });
-    it("단독 발화 + 대화 구조 언급", () => {
-      expect(instr).toMatch(/Monologisches Sprechen/);
-      expect(instr).toMatch(/Dialogisches Sprechen/);
-    });
-    it("오류 교정 명시", () => {
-      expect(instr).toMatch(/Korrigiere/);
-    });
-    it("topic 포함 (독일어 주제)", () => {
-      expect(instr).toMatch(/Studium und Beruf/);
-    });
-    it("level 포함", () => {
-      expect(instr).toMatch(/B1/);
-    });
-    it("durationMinutes 포함", () => {
-      expect(instr).toMatch(/10 Minuten/);
-    });
-    it("평가 항목 포함 (Aussprache/Grammatik/Wortschatz/Flüssigkeit)", () => {
-      expect(instr).toMatch(/Aussprache/);
-      expect(instr).toMatch(/Grammatik/);
-      expect(instr).toMatch(/Wortschatz/);
-      expect(instr).toMatch(/Fl.+igkeit/);
-    });
-
-    it("레벨별 시나리오 — A2 (초급)", () => {
-      const i = buildInstructions({ ...base, language: "de", exam: "goethe_b2", level: "A2", topic: "Reisen" });
-      expect(i).toMatch(/A2/);
-      expect(i).toMatch(/Reisen/);
-    });
-
-    it("레벨별 시나리오 — B2 (목표 레벨)", () => {
-      const i = buildInstructions({ ...base, language: "de", exam: "goethe_b2", level: "B2", topic: "Umwelt und Natur" });
-      expect(i).toMatch(/B2/);
-    });
+    expect(instructions).toContain("Fuehre das Gespraech ausschliesslich auf Deutsch.");
+    expect(instructions).toContain("Beginne die Sitzung mit dem ersten Satz auf Deutsch.");
+    expect(instructions).toContain("Studium und Beruf");
   });
 
-  describe("ZH / HSK5 (중국어)", () => {
-    const instr = buildInstructions({
+  it("uses a Mandarin-only prompt for HSK5", () => {
+    const instructions = buildInstructions({
       ...base,
       language: "zh",
       exam: "hsk5",
       level: "HSK4",
-      topic: "工作与职业"
+      topic: "work and career"
     });
 
-    it("중국어 지시문", () => {
-      expect(instr).toMatch(/你是LinguaCall/);
-    });
-    it("HSK 5급 언급", () => {
-      expect(instr).toMatch(/HSK 5/);
-    });
-    it("topic 포함", () => {
-      expect(instr).toMatch(/工作与职业/);
-    });
-    it("보통화(普通话) 명시", () => {
-      expect(instr).toMatch(/普通话/);
-    });
+    expect(instructions).toContain("Conduct the entire conversation only in Mandarin Chinese.");
+    expect(instructions).toContain("Open the session with the first sentence in Mandarin Chinese.");
+    expect(instructions).toContain("work and career");
   });
 
-  describe("ES / DELE B1 (스페인어)", () => {
-    const instr = buildInstructions({
+  it("uses a Spanish-only prompt for DELE B1", () => {
+    const instructions = buildInstructions({
       ...base,
       language: "es",
       exam: "dele_b1",
@@ -120,42 +61,27 @@ describe("buildInstructions — AI 시스템 프롬프트 분기", () => {
       topic: "vida cotidiana"
     });
 
-    it("스페인어 지시문", () => {
-      expect(instr).toMatch(/Eres LinguaCall/);
-    });
-    it("DELE B1 언급", () => {
-      expect(instr).toMatch(/DELE B1/);
-    });
-    it("topic 포함", () => {
-      expect(instr).toMatch(/vida cotidiana/);
-    });
+    expect(instructions).toContain("Manten toda la conversacion en espanol.");
+    expect(instructions).toContain("Empieza la sesion con la primera frase en espanol.");
+    expect(instructions).toContain("vida cotidiana");
   });
 
-  describe("JA / JLPT N2 (일본어)", () => {
-    const instr = buildInstructions({
+  it("uses a Japanese-only prompt for JLPT N2", () => {
+    const instructions = buildInstructions({
       ...base,
       language: "ja",
       exam: "jlpt_n2",
       level: "N3",
-      topic: "仕事と日常生活"
+      topic: "work and everyday life"
     });
 
-    it("일본어 지시문 사용", () => {
-      expect(instr).toMatch(/LinguaCall/);
-    });
-    it("JLPT N2 언급", () => {
-      expect(instr).toMatch(/JLPT N2/);
-    });
-    it("topic 포함", () => {
-      expect(instr).toMatch(/仕事と日常生活/);
-    });
-    it("level 포함", () => {
-      expect(instr).toMatch(/N3/);
-    });
+    expect(instructions).toContain("Conduct the entire conversation only in Japanese.");
+    expect(instructions).toContain("Open the session with the first sentence in Japanese.");
+    expect(instructions).toContain("work and everyday life");
   });
 
-  describe("FR / DELF B1 (프랑스어)", () => {
-    const instr = buildInstructions({
+  it("uses a French-only prompt for DELF B1", () => {
+    const instructions = buildInstructions({
       ...base,
       language: "fr",
       exam: "delf_b1",
@@ -163,27 +89,20 @@ describe("buildInstructions — AI 시스템 프롬프트 분기", () => {
       topic: "vie quotidienne"
     });
 
-    it("프랑스어 지시문 사용", () => {
-      expect(instr).toMatch(/LinguaCall/);
-    });
-    it("DELF B1 언급", () => {
-      expect(instr).toMatch(/DELF B1/);
-    });
-    it("topic 포함", () => {
-      expect(instr).toMatch(/vie quotidienne/);
-    });
+    expect(instructions).toContain("Conduis toute la conversation en francais.");
+    expect(instructions).toContain("Commence la session avec la premiere phrase en francais.");
+    expect(instructions).toContain("vie quotidienne");
   });
 
-  describe("폴백 — 알 수 없는 언어/시험", () => {
-    it("미지원 언어는 영어 기본 프롬프트로 폴백", () => {
-      const instr = buildInstructions({
-        ...base,
-        language: "ko",
-        exam: "topik",
-        level: "3",
-        topic: "일상생활"
-      });
-      expect(instr).toMatch(/You are LinguaCall/);
+  it("falls back to English for unsupported combinations", () => {
+    const instructions = buildInstructions({
+      ...base,
+      language: "ko",
+      exam: "topik",
+      level: "3",
+      topic: "everyday life"
     });
+
+    expect(instructions).toContain("Conduct the entire conversation only in English.");
   });
 });

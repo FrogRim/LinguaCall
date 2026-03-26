@@ -180,8 +180,7 @@ export const startWebVoiceClient = async ({
       dataChannel.send(JSON.stringify({
         type: "response.create",
         response: {
-          modalities: ["audio", "text"],
-          instructions: "Greet the learner briefly and start the conversation immediately."
+          modalities: ["audio", "text"]
         }
       }));
     } catch {
