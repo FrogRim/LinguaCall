@@ -6,18 +6,20 @@ Real-time AI conversation practice for language exam preparation.
 
 LinguaCall is now a Korean-market MVP that has already been cut over to a self-hosted launch stack.
 
-- auth: phone OTP with SOLAPI SMS
-- session auth: app-managed `httpOnly` cookie sessions
+- auth: Supabase Auth phone OTP
+- session auth: Supabase access/refresh session with bearer auth to API
 - billing: Toss only
 - runtime: browser-direct OpenAI Realtime voice over WebRTC
 - database: Supabase Postgres only
 - deploy: VPS self-hosted `web + api + worker + caddy`
 
-This means the active product path no longer depends on Clerk, Stripe, Railway, Vercel, Naver SMS, or Sentry.
+This means the active product path no longer depends on Clerk, Stripe, Railway, Vercel, Naver SMS, SOLAPI, or Sentry.
+
+Important security note: the active login path now uses Supabase Auth bearer sessions, but authorization is still enforced primarily in the API layer. Database RLS is still a secondary guard rather than the primary user-isolation boundary.
 
 ## Current Launch Direction
 
-- auth: phone OTP + app-managed session cookies
+- auth: Supabase Auth phone OTP + refresh session recovery
 - billing: Toss only
 - runtime: browser-direct OpenAI Realtime voice over WebRTC
 - data: Supabase Postgres only
@@ -25,14 +27,16 @@ This means the active product path no longer depends on Clerk, Stripe, Railway, 
 
 This repository is being hardened toward a Korean-market launch first. Historical references to Clerk, Stripe, Railway, Vercel, and Sentry should be treated as archival unless explicitly marked otherwise.
 
+For the current launch path, authorization is enforced in the API layer. Existing RLS SQL should be treated as a secondary guard, not the primary user-isolation boundary.
+
 ## Launch Status
 
 The current MVP launch path is complete enough to run real user tests.
 
 - deployed on a VPS with Docker Compose
 - HTTPS terminated by Caddy
-- phone OTP login working with SOLAPI
-- returning users can stay signed in on the same device via refresh-cookie sessions
+- phone OTP login working via Supabase Auth
+- returning users can stay signed in on the same device via refresh-session recovery
 - Toss sandbox billing working
 - session creation working
 - realtime voice session bootstrapping working
@@ -45,12 +49,12 @@ Remaining work should be treated as launch hardening and product iteration, not 
 The project was materially simplified from its earlier SaaS-heavy setup.
 
 - removed Clerk from the active runtime path
-- replaced Naver SMS with SOLAPI
+- replaced app-managed SMS login with Supabase Auth phone OTP
 - narrowed billing from multi-provider to Toss only
 - moved background loops out of the API process into a dedicated worker
 - moved deployment from Railway/Vercel assumptions to VPS self-hosting
 - removed Sentry from the active bootstrap path
-- rewired the web app to cookie-session auth instead of bearer tokens from Clerk
+- rewired the web app to Supabase Auth phone OTP and bearer-token API auth
 
 ## What Is Archival
 
@@ -61,6 +65,7 @@ You may still see historical references in old docs or older code paths. For the
 - Railway
 - Vercel
 - Naver SMS
+- SOLAPI
 - Sentry
 
 If a document conflicts with the sections above, prefer this README plus the runbooks listed in `Source Of Truth`.
@@ -79,7 +84,7 @@ Browser
 External providers:
 - OpenAI
 - Toss Payments
-- SOLAPI SMS
+- Twilio via Supabase Phone Auth
 ```
 
 ## Tech Stack
@@ -90,7 +95,7 @@ External providers:
 | Backend | Express 4, Node 20, TypeScript 5 |
 | Database | Supabase-managed PostgreSQL via `pg` |
 | AI / Voice | OpenAI Realtime API, WebRTC |
-| Auth | App-managed phone OTP + session cookies |
+| Auth | Supabase Auth phone OTP + bearer session |
 | Billing | Toss Payments |
 | Jobs | Dedicated `worker` process |
 | Testing | Vitest, Supertest |
@@ -100,10 +105,10 @@ External providers:
 
 ### Authentication
 
-1. `POST /auth/otp/start`
-2. `POST /auth/otp/verify`
-3. API sets `httpOnly` session cookies
-4. protected routes validate the app session cookie
+1. web requests phone OTP from Supabase Auth
+2. web verifies the SMS code with Supabase Auth
+3. web stores Supabase access/refresh session locally
+4. protected API routes validate the bearer token and map it to the internal user record
 
 ### Learning session
 
@@ -131,17 +136,17 @@ External providers:
 Only these external services are part of the current launch architecture:
 
 - [OpenAI](https://platform.openai.com/)
-- [Supabase](https://supabase.com/) for managed PostgreSQL
+- [Supabase](https://supabase.com/) for Auth and managed PostgreSQL
 - [Toss Payments](https://developers.tosspayments.com/)
-- SOLAPI SMS
+- Twilio via Supabase Phone Auth
 
 ## Key API Surface
 
 ```text
-POST /auth/otp/start
-POST /auth/otp/verify
-GET  /auth/me
-POST /auth/logout
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
+SUPABASE_URL
+SUPABASE_ANON_KEY
 
 GET  /users/me
 POST /users/me
@@ -185,8 +190,12 @@ API_BASE_URL=https://api.example.com
 ALLOWED_ORIGINS=https://app.example.com
 VITE_API_BASE_URL=https://api.example.com
 VITE_TOSS_CLIENT_KEY=test_ck_...
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 
 DATABASE_URL=postgresql://...
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-supabase-anon-key
 
 OPENAI_API_KEY=sk-...
 OPENAI_REALTIME_MODEL=gpt-realtime-mini
@@ -197,11 +206,6 @@ OPENAI_EVAL_MODEL=gpt-4.1-mini
 TOSS_CLIENT_KEY=...
 TOSS_SECRET_KEY=...
 
-SOLAPI_API_KEY=...
-SOLAPI_API_SECRET=...
-SOLAPI_FROM=...
-
-SESSION_COOKIE_SECRET=replace-me
 WORKER_SHARED_SECRET=replace-me
 WORKER_BATCH_INTERVAL_MS=30000
 WORKER_BATCH_LIMIT=20
@@ -209,10 +213,11 @@ WORKER_BATCH_LIMIT=20
 
 ## Source Of Truth
 
+- architecture overview: [`docs/architecture-overview.md`](docs/architecture-overview.md)
 - deploy runbook: [`docs/runbooks/vps-deploy.md`](docs/runbooks/vps-deploy.md)
 - launch E2E checklist: [`docs/runbooks/launch-e2e-checklist.md`](docs/runbooks/launch-e2e-checklist.md)
+- phone auth runbook: [`docs/runbooks/supabase-phone-auth-manual.md`](docs/runbooks/supabase-phone-auth-manual.md)
 - Toss sandbox manual: [`docs/runbooks/toss-sandbox-manual.md`](docs/runbooks/toss-sandbox-manual.md)
-- SOLAPI SMS manual: [`docs/runbooks/solapi-sms-manual.md`](docs/runbooks/solapi-sms-manual.md)
 - launch progress: [`docs/superpowers/reports/2026-03-23-auth-cutover-progress.md`](docs/superpowers/reports/2026-03-23-auth-cutover-progress.md)
 - launch design: [`docs/superpowers/specs/2026-03-23-saas-launch-refactor-design.md`](docs/superpowers/specs/2026-03-23-saas-launch-refactor-design.md)
 - launch plan: [`docs/superpowers/plans/2026-03-23-saas-launch-refactor-plan.md`](docs/superpowers/plans/2026-03-23-saas-launch-refactor-plan.md)

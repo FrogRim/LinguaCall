@@ -53,8 +53,8 @@ export default function ScreenPrivacy() {
         <h2>{isKo ? '4. 제3자 제공 및 외부 처리' : '4. Third-party processing'}</h2>
         <p>
           {isKo
-            ? '서비스는 OpenAI, Toss Payments, SOLAPI, Supabase 등 외부 서비스와 연동됩니다. 이들은 각자의 역할에 필요한 범위 안에서만 데이터를 처리합니다.'
-            : 'The service integrates with providers such as OpenAI, Toss Payments, SOLAPI, and Supabase. Each provider processes data only within the scope required for its role.'}
+            ? '서비스는 OpenAI, Toss Payments, Twilio, Supabase 등 외부 서비스와 연동됩니다. 이들은 각자의 역할에 필요한 범위 안에서만 데이터를 처리합니다.'
+            : 'The service integrates with providers such as OpenAI, Toss Payments, Twilio, and Supabase. Each provider processes data only within the scope required for its role.'}
         </p>
       </section>
 

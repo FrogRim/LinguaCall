@@ -1,5 +1,14 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import i18n, { getCachedUiLanguage, setCachedUiLanguage, type UiLanguageCode } from '../i18n';
+import {
+  persistSupabaseSession,
+  readStoredSupabaseSession,
+  refreshSupabaseSession,
+  signOutSupabase,
+  startSupabasePhoneOtp,
+  verifySupabasePhoneOtp,
+  type StoredSupabaseSession
+} from '../lib/supabaseAuth';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000';
 
@@ -11,6 +20,8 @@ type UserContextValue = {
   uiLanguage: UiLanguageCode;
   setUiLanguage: (lang: UiLanguageCode) => Promise<void>;
   clearIdentity: () => Promise<void>;
+  startPhoneOtp: (phone: string) => Promise<void>;
+  verifyPhoneOtp: (phone: string, code: string) => Promise<void>;
 };
 
 const UserContext = createContext<UserContextValue | null>(null);
@@ -19,25 +30,46 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [uiLanguage, setUiLanguageState] = useState<UiLanguageCode>(getCachedUiLanguage);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
-  const getToken = useCallback(async () => null, []);
+  const [session, setSession] = useState<StoredSupabaseSession | null>(null);
+  const getToken = useCallback(async () => session?.accessToken ?? readStoredSupabaseSession()?.accessToken ?? null, [session]);
+
+  const syncAuthStateWithApi = useCallback(async (accessToken: string) => {
+    const res = await fetch(`${API_BASE}/users/me`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+    return res.ok;
+  }, []);
 
   const refreshSession = useCallback(async () => {
+    const existing = readStoredSupabaseSession();
+    if (!existing?.refreshToken) {
+      persistSupabaseSession(null);
+      setSession(null);
+      setIsAuthenticated(false);
+      setSessionChecked(true);
+      return;
+    }
+
     try {
-      await fetch(`${API_BASE}/auth/refresh`, {
-        method: 'POST',
-        credentials: 'include'
-      }).catch(() => null);
-      const res = await fetch(`${API_BASE}/auth/me`, {
-        credentials: 'include'
-      });
-      const payload = await res.json().catch(() => null) as { ok?: boolean } | null;
-      setIsAuthenticated(Boolean(payload?.ok && res.ok));
+      const nextSession = await refreshSupabaseSession(existing.refreshToken);
+      persistSupabaseSession(nextSession);
+      setSession(nextSession);
+      const synced = await syncAuthStateWithApi(nextSession.accessToken);
+      setIsAuthenticated(synced);
+      if (!synced) {
+        persistSupabaseSession(null);
+        setSession(null);
+      }
     } catch {
+      persistSupabaseSession(null);
+      setSession(null);
       setIsAuthenticated(false);
     } finally {
       setSessionChecked(true);
     }
-  }, []);
+  }, [syncAuthStateWithApi]);
 
   useEffect(() => {
     void refreshSession();
@@ -64,21 +96,41 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [getToken]);
 
   const clearIdentity = useCallback(async () => {
+    const activeToken = session?.accessToken ?? readStoredSupabaseSession()?.accessToken;
     try {
-      await fetch(`${API_BASE}/auth/logout`, {
-        method: 'POST',
-        credentials: 'include'
-      });
+      if (activeToken) {
+        await signOutSupabase(activeToken);
+      }
     } catch {
       // best-effort logout
     }
+    persistSupabaseSession(null);
+    setSession(null);
     setIsAuthenticated(false);
     setSessionChecked(true);
     window.location.hash = '#/';
+  }, [session]);
+
+  const startPhoneOtp = useCallback(async (phone: string) => {
+    await startSupabasePhoneOtp(phone);
   }, []);
 
+  const verifyPhoneOtp = useCallback(async (phone: string, code: string) => {
+    const nextSession = await verifySupabasePhoneOtp(phone, code);
+    persistSupabaseSession(nextSession);
+    setSession(nextSession);
+    const synced = await syncAuthStateWithApi(nextSession.accessToken);
+    setIsAuthenticated(synced);
+    setSessionChecked(true);
+    if (!synced) {
+      persistSupabaseSession(null);
+      setSession(null);
+      throw new Error('failed_to_sync_supabase_identity');
+    }
+  }, [syncAuthStateWithApi]);
+
   return (
-    <UserContext.Provider value={{ getToken, isAuthenticated, sessionChecked, refreshSession, uiLanguage, setUiLanguage, clearIdentity }}>
+    <UserContext.Provider value={{ getToken, isAuthenticated, sessionChecked, refreshSession, uiLanguage, setUiLanguage, clearIdentity, startPhoneOtp, verifyPhoneOtp }}>
       {children}
     </UserContext.Provider>
   );

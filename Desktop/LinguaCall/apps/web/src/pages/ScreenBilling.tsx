@@ -17,7 +17,7 @@ import { startTossCheckout } from '../features/billing/toss';
 
 export default function ScreenBilling() {
   const { t, i18n } = useTranslation();
-  const { getToken } = useUser();
+  const { getToken, refreshSession } = useUser();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const copy = getFriendlyCopy(i18n.language);
@@ -34,7 +34,7 @@ export default function ScreenBilling() {
   const [confirmingPayment, setConfirmingPayment] = useState(false);
 
   const load = useCallback(async () => {
-    const api = apiClient(getToken);
+    const api = apiClient(getToken, refreshSession);
     setLoading(true);
     setError('');
     try {
@@ -49,7 +49,7 @@ export default function ScreenBilling() {
     } finally {
       setLoading(false);
     }
-  }, [getToken]);
+  }, [getToken, refreshSession]);
 
   useEffect(() => {
     void load();
@@ -68,7 +68,7 @@ export default function ScreenBilling() {
     let cancelled = false;
 
     const confirmPayment = async () => {
-      const api = apiClient(getToken);
+      const api = apiClient(getToken, refreshSession);
       setConfirmingPayment(true);
       try {
         await api.post<UserSubscription>('/billing/toss/confirm', redirect);
@@ -95,10 +95,10 @@ export default function ScreenBilling() {
     return () => {
       cancelled = true;
     };
-  }, [checkoutResult, getToken, load]);
+  }, [checkoutResult, getToken, refreshSession, load]);
 
   const handleCheckout = async (planCode: string) => {
-    const api = apiClient(getToken);
+    const api = apiClient(getToken, refreshSession);
     setCheckoutLoading(planCode);
     try {
       const payload = createCheckoutPayload(window.location.href, planCode);

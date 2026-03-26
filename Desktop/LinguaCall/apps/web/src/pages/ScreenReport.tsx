@@ -15,7 +15,7 @@ export default function ScreenReport() {
   const { t, i18n } = useTranslation();
   const { reportId } = useParams<{ reportId: string }>();
   const navigate = useNavigate();
-  const { getToken } = useUser();
+  const { getToken, refreshSession } = useUser();
   const copy = getFriendlyCopy(i18n.language);
   const isKo = i18n.language.startsWith('ko');
 
@@ -25,7 +25,7 @@ export default function ScreenReport() {
 
   useEffect(() => {
     if (!reportId) return;
-    const api = apiClient(getToken);
+    const api = apiClient(getToken, refreshSession);
     void (async () => {
       try {
         const r = await api.get<Report>(`/reports/${decodeURIComponent(reportId)}`);
@@ -36,7 +36,7 @@ export default function ScreenReport() {
         setLoading(false);
       }
     })();
-  }, [reportId, getToken]);
+  }, [reportId, getToken, refreshSession]);
 
   return (
     <AppShell

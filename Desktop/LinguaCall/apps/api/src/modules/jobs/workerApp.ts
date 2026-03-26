@@ -61,8 +61,8 @@ export const logWorkerBatchResult = (result: WorkerBatchResult) => {
     result.missed.marked > 0 ||
     result.reportNotifications.notified > 0
   ) {
-    console.log(
-      `worker-batch: dispatched=${result.dispatched.count}, reminders=${result.reminders.sent}, missed=${result.missed.marked}, reportNotifications=${result.reportNotifications.notified}`
+    process.stdout.write(
+      `worker-batch: dispatched=${result.dispatched.count}, reminders=${result.reminders.sent}, missed=${result.missed.marked}, reportNotifications=${result.reportNotifications.notified}\n`
     );
   }
 };

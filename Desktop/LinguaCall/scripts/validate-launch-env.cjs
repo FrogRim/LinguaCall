@@ -9,7 +9,11 @@ const REQUIRED_KEYS = [
   "ALLOWED_ORIGINS",
   "VITE_API_BASE_URL",
   "VITE_TOSS_CLIENT_KEY",
+  "VITE_SUPABASE_URL",
+  "VITE_SUPABASE_ANON_KEY",
   "DATABASE_URL",
+  "SUPABASE_URL",
+  "SUPABASE_ANON_KEY",
   "OPENAI_API_KEY",
   "OPENAI_REALTIME_MODEL",
   "OPENAI_REALTIME_VOICE",
@@ -17,10 +21,6 @@ const REQUIRED_KEYS = [
   "OPENAI_EVAL_MODEL",
   "TOSS_CLIENT_KEY",
   "TOSS_SECRET_KEY",
-  "SOLAPI_API_KEY",
-  "SOLAPI_API_SECRET",
-  "SOLAPI_FROM",
-  "SESSION_COOKIE_SECRET",
   "WORKER_SHARED_SECRET",
   "WORKER_BATCH_INTERVAL_MS",
   "WORKER_BATCH_LIMIT"
@@ -62,7 +62,7 @@ function validateLaunchEnv(env) {
 
   const invalid = [];
 
-  for (const key of ["APP_BASE_URL", "API_BASE_URL", "VITE_API_BASE_URL"]) {
+  for (const key of ["APP_BASE_URL", "API_BASE_URL", "VITE_API_BASE_URL", "VITE_SUPABASE_URL", "SUPABASE_URL"]) {
     if (env[key] && !isHttpsUrl(env[key])) {
       invalid.push(`${key} must be an https URL`);
     }

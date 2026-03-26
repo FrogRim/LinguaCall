@@ -29,19 +29,10 @@ export function describeApiError(error: unknown, context: string): string {
   return apiError.message || 'request failed';
 }
 
-export function apiClient(getToken: () => Promise<string | null>) {
-  const refreshAuthSession = async () => {
-    const res = await fetch(`${API_BASE}/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'content-type': 'application/json'
-      }
-    });
-    const payload = (await res.json()) as ApiResponse<{ userId: string; sessionId: string }>;
-    return Boolean(res.ok && payload.ok);
-  };
-
+export function apiClient(
+  getToken: () => Promise<string | null>,
+  refreshAuthSession?: () => Promise<void>
+) {
   const h = async (): Promise<Record<string, string>> => {
     const token = await getToken();
     return {
@@ -62,8 +53,10 @@ export function apiClient(getToken: () => Promise<string | null>) {
     });
     const payload = (await res.json()) as ApiResponse<T>;
 
-    if (res.status === 401 && allowRefresh && url !== '/auth/refresh') {
-      const refreshed = await refreshAuthSession().catch(() => false);
+    if (res.status === 401 && allowRefresh && refreshAuthSession) {
+      const refreshed = await refreshAuthSession()
+        .then(() => true)
+        .catch(() => false);
       if (refreshed) {
         return request<T>(url, init, false);
       }

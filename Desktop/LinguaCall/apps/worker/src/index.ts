@@ -10,4 +10,4 @@ const limit = parseWorkerBatchLimit();
 
 startWorkerBatchLoop({ intervalMs, limit });
 
-console.log(`LinguaCall worker started interval=${intervalMs}ms limit=${limit}`);
+process.stdout.write(`LinguaCall worker started interval=${intervalMs}ms limit=${limit}\n`);

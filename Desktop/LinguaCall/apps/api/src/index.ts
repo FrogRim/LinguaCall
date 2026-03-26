@@ -10,7 +10,6 @@ import callsRouter from "./routes/calls";
 import workersRouter from "./routes/workers";
 import reportsRouter from "./routes/reports";
 import billingRouter from "./routes/billing";
-import { createAuthRouter } from "./modules/auth/routes";
 import { attachMediaStreamServer } from "./mediaStream";
 import { mediaRuntime } from "./mediaRuntime";
 import { store } from "./storage/inMemoryStore";
@@ -18,6 +17,8 @@ import { classifyMediaStreamFailureReason } from "./callFaultClassifier";
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 4000);
+
+app.set("trust proxy", 1);
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
@@ -87,7 +88,6 @@ app.get("/healthz", (_req, res) => {
   return;
 });
 
-app.use("/auth", createAuthRouter());
 app.use("/users", usersRouter);
 app.use("/sessions", sessionsRouter);
 app.use("/calls/initiate", callInitiateLimiter);
@@ -135,7 +135,7 @@ if (enableTwilioMediaStream) {
 }
 
 server.listen(PORT, () => {
-  console.log(`LinguaCall API listening on :${PORT}`);
+  process.stdout.write(`LinguaCall API listening on :${PORT}\n`);
 });
 
 export default app;

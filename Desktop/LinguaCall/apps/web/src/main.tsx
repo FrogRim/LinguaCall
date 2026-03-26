@@ -30,8 +30,8 @@ class ErrorFallbackBoundary extends React.Component<
     return { hasError: true };
   }
 
-  componentDidCatch(error: unknown) {
-    console.error('web runtime error', error);
+  componentDidCatch(_error: unknown) {
+    return;
   }
 
   render() {

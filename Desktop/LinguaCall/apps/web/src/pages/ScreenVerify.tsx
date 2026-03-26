@@ -10,12 +10,20 @@ import { Label } from '../components/ui/label';
 import { StatusBanner } from '../components/layout/SectionCard';
 import { getFriendlyCopy } from '../content/friendlyCopy';
 import { useUser } from '../context/UserContext';
-import { apiClient, describeApiError } from '../lib/api';
+import { describeApiError } from '../lib/api';
 import { completeVerifiedSession } from '../features/auth/verifyFlow';
+
+function maskPhone(phone: string) {
+  const digits = phone.replace(/\D+/g, '');
+  if (digits.length < 4) {
+    return phone;
+  }
+  return `***-****-${digits.slice(-4)}`;
+}
 
 export default function ScreenVerify() {
   const { i18n, t } = useTranslation();
-  const { getToken, refreshSession } = useUser();
+  const { refreshSession, startPhoneOtp, verifyPhoneOtp } = useUser();
   const navigate = useNavigate();
   const copy = getFriendlyCopy(i18n.language);
 
@@ -26,17 +34,12 @@ export default function ScreenVerify() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  const api = apiClient(getToken);
-
   const sendCode = async () => {
     setLoading(true);
     setError('');
     try {
-      const result = await api.post<{ maskedPhone: string; debugCode: string }>(
-        '/auth/otp/start',
-        { phone }
-      );
-      setMessage(`Sent to ${result.maskedPhone} (dev code: ${result.debugCode})`);
+      await startPhoneOtp(phone);
+      setMessage(`Sent to ${maskPhone(phone)}`);
       setShowOtp(true);
     } catch (err) {
       setError(describeApiError(err, 'phone_start'));
@@ -49,10 +52,7 @@ export default function ScreenVerify() {
     setLoading(true);
     setError('');
     try {
-      await api.post<{ userId: string; sessionId: string }>('/auth/otp/verify', {
-        phone,
-        code: otp
-      });
+      await verifyPhoneOtp(phone, otp);
       await completeVerifiedSession({
         refreshSession,
         navigate

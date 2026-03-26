@@ -189,7 +189,7 @@ const LANG_CONFIGS: Record<string, LangExamConfig> = {
 
 export default function ScreenSession() {
   const { t, i18n } = useTranslation();
-  const { getToken, clearIdentity } = useUser();
+  const { getToken, refreshSession, clearIdentity } = useUser();
   const navigate = useNavigate();
   const copy = getFriendlyCopy(i18n.language);
   const isKo = i18n.language.startsWith('ko');
@@ -222,7 +222,7 @@ export default function ScreenSession() {
   const historyRef = useRef<HTMLDivElement | null>(null);
   const detailRef = useRef<HTMLDivElement | null>(null);
 
-  const makeApi = useCallback(() => apiClient(getToken), [getToken]);
+  const makeApi = useCallback(() => apiClient(getToken, refreshSession), [getToken, refreshSession]);
 
   const handleLanguageChange = (lang: 'en' | 'de' | 'zh' | 'es' | 'ja' | 'fr') => {
     const cfg = LANG_CONFIGS[lang];

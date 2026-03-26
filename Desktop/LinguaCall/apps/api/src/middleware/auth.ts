@@ -1,5 +1,9 @@
 import { NextFunction, Request, Response } from "express";
-import { verifyAccessToken } from "../modules/auth/session";
+import {
+  getSupabaseDisplayName,
+  toSupabaseSubject,
+  verifySupabaseAccessToken
+} from "../modules/auth/supabase";
 
 export interface AuthenticatedRequest extends Request {
   userId: string;
@@ -13,74 +17,91 @@ type AuthIdentity = {
 };
 
 type AuthMiddlewareRepository = {
-  findIdentityByUserId(userId: string): Promise<AuthIdentity | undefined>;
+  syncSupabaseIdentity(input: {
+    authUserId: string;
+    email?: string | null;
+    phone?: string | null;
+    name?: string;
+  }): Promise<AuthIdentity>;
 };
 
 type CreateRequireAuthenticatedUserOptions = {
   repo?: AuthMiddlewareRepository;
-  accessTokenSecret?: string;
 };
 
-const AUTH_ACCESS_COOKIE = "lc_access";
-
-const readCookie = (cookieHeader: string | undefined, name: string) => {
-  if (!cookieHeader) {
-    return undefined;
-  }
-  const pair = cookieHeader
-    .split(";")
-    .map((entry) => entry.trim())
-    .find((entry) => entry.startsWith(`${name}=`));
-  if (!pair) {
-    return undefined;
-  }
-  return decodeURIComponent(pair.slice(name.length + 1));
-};
+const AUTHORIZATION_PREFIX = "Bearer ";
 
 const createDefaultRepo = (): AuthMiddlewareRepository => {
   const { store } = require("../storage/inMemoryStore") as typeof import("../storage/inMemoryStore");
   return {
-    async findIdentityByUserId(userId: string) {
-      const result = await store.getPool().query<{ id: string; clerk_user_id: string }>(
-        "SELECT id, clerk_user_id FROM users WHERE id = $1 LIMIT 1",
-        [userId]
-      );
-      if (!result.rows.length) {
-        return undefined;
+    async syncSupabaseIdentity(input) {
+      const subject = toSupabaseSubject(input.authUserId);
+      const profile = await store.upsertUser(subject, {
+        name: input.name,
+        email: input.email ?? undefined
+      });
+
+      if (input.phone) {
+        const normalizedPhone = input.phone.trim();
+        const phoneLast4 = normalizedPhone.slice(-4);
+        const phoneCountryCode = normalizedPhone.startsWith("+82") ? "+82" : null;
+        await store.getPool().query(
+          `
+            UPDATE users
+            SET phone_encrypted = COALESCE($2, phone_encrypted),
+                phone_last4 = COALESCE($3, phone_last4),
+                phone_country_code = COALESCE($4, phone_country_code),
+                phone_verified = true,
+                phone_verified_at = COALESCE(phone_verified_at, NOW()),
+                updated_at = NOW()
+            WHERE id = $1
+          `,
+          [profile.id, normalizedPhone, phoneLast4, phoneCountryCode]
+        );
       }
+
       return {
-        userId: result.rows[0].id,
-        clerkUserId: result.rows[0].clerk_user_id
+        userId: profile.id,
+        clerkUserId: subject
       };
     }
   };
 };
 
+const readBearerToken = (authorizationHeader: string | undefined) => {
+  if (!authorizationHeader || !authorizationHeader.startsWith(AUTHORIZATION_PREFIX)) {
+    return undefined;
+  }
+  const token = authorizationHeader.slice(AUTHORIZATION_PREFIX.length).trim();
+  return token || undefined;
+};
+
 export function createRequireAuthenticatedUser(
   options: CreateRequireAuthenticatedUserOptions = {}
 ) {
-  const accessTokenSecret =
-    options.accessTokenSecret ?? process.env.SESSION_COOKIE_SECRET ?? "dev-session-secret";
+  const repo = options.repo ?? createDefaultRepo();
 
   return async function requireAuthenticatedUser(
     req: Request,
     res: Response,
     next: NextFunction
   ) {
-    const accessToken = readCookie(req.headers.cookie, AUTH_ACCESS_COOKIE);
-    if (accessToken) {
-      const payload = verifyAccessToken(accessToken, accessTokenSecret);
-      if (payload) {
-        const repo = options.repo ?? createDefaultRepo();
-        const identity = await repo.findIdentityByUserId(payload.userId);
-        if (identity) {
-          const authReq = req as AuthenticatedRequest;
-          authReq.userId = identity.userId;
-          authReq.clerkUserId = identity.clerkUserId;
-          authReq.sessionId = payload.sessionId;
-          next();
-          return;
-        }
+    const bearerToken = readBearerToken(req.headers.authorization);
+    if (bearerToken) {
+      const supabaseUser = await verifySupabaseAccessToken(bearerToken);
+      if (supabaseUser) {
+        const identity = await repo.syncSupabaseIdentity({
+          authUserId: supabaseUser.id,
+          email: supabaseUser.email ?? undefined,
+          phone: supabaseUser.phone ?? undefined,
+          name: getSupabaseDisplayName(supabaseUser)
+        });
+
+        const authReq = req as AuthenticatedRequest;
+        authReq.userId = identity.userId;
+        authReq.clerkUserId = identity.clerkUserId;
+        next();
+        return;
       }
     }
 

@@ -2,24 +2,37 @@ import express from "express";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createRequireAuthenticatedUser, type AuthenticatedRequest } from "../middleware/auth";
-import { issueAccessToken } from "../modules/auth/session";
+
+vi.mock("../modules/auth/supabase", () => ({
+  getSupabaseDisplayName: vi.fn(() => "Test User"),
+  toSupabaseSubject: vi.fn((id: string) => `supabase:${id}`),
+  verifySupabaseAccessToken: vi.fn()
+}));
+
+const { verifySupabaseAccessToken } = await import("../modules/auth/supabase");
 
 describe("createRequireAuthenticatedUser", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("authenticates requests from app session cookies", async () => {
+  it("authenticates requests from Supabase bearer tokens", async () => {
+    vi.mocked(verifySupabaseAccessToken).mockResolvedValue({
+      id: "supabase-user-1",
+      email: "user@example.com",
+      phone: "+821012345678",
+      user_metadata: { name: "Test User" }
+    });
+
     const app = express();
     app.get(
       "/protected",
       createRequireAuthenticatedUser({
-        accessTokenSecret: "middleware-secret",
         repo: {
-          async findIdentityByUserId(userId) {
+          async syncSupabaseIdentity() {
             return {
-              userId,
-              clerkUserId: "local:phone-user"
+              userId: "user-123",
+              clerkUserId: "supabase:supabase-user-1"
             };
           }
         }
@@ -36,35 +49,27 @@ describe("createRequireAuthenticatedUser", () => {
       }
     );
 
-    const accessToken = issueAccessToken(
-      {
-        userId: "user-123",
-        sessionId: "session-123",
-        expiresAt: "2099-01-01T00:00:00.000Z"
-      },
-      "middleware-secret"
-    );
-
     const response = await request(app)
       .get("/protected")
-      .set("Cookie", [`lc_access=${accessToken}`]);
+      .set("Authorization", "Bearer supabase-token");
 
     expect(response.status).toBe(200);
     expect(response.body.data).toEqual({
       userId: "user-123",
-      clerkUserId: "local:phone-user"
+      clerkUserId: "supabase:supabase-user-1"
     });
   });
 
-  it("rejects requests without an app session cookie", async () => {
+  it("rejects requests without a bearer token", async () => {
+    vi.mocked(verifySupabaseAccessToken).mockResolvedValue(null);
+
     const app = express();
     app.get(
       "/protected",
       createRequireAuthenticatedUser({
-        accessTokenSecret: "middleware-secret",
         repo: {
-          async findIdentityByUserId() {
-            return undefined;
+          async syncSupabaseIdentity() {
+            throw new Error("not implemented in rejection test");
           }
         }
       }),
