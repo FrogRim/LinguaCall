@@ -69,6 +69,36 @@ const REALTIME_LANGUAGE_NAMES: Record<string, string> = {
   fr: "French"
 };
 
+const REALTIME_TRANSCRIPTION_HINTS: Record<string, string[]> = {
+  en: [
+    "The learner may be a Korean speaker practicing English.",
+    "Preserve intended English words even when pronunciation is accented.",
+    "Do not rewrite learner grammar into native English."
+  ],
+  de: [
+    "The learner may pause before nouns and separable verbs.",
+    "Keep German learner word order as spoken unless the audio is clearly different."
+  ],
+  zh: [
+    "Prefer Mandarin Chinese words over English substitutions when the audio is close.",
+    "Preserve learner wording rather than correcting tones or grammar."
+  ],
+  es: [
+    "Prefer Spanish learner wording even when pronunciation is tentative.",
+    "Do not normalize verb endings unless clearly spoken."
+  ],
+  ja: [
+    "The learner may be a Korean speaker practicing Japanese.",
+    "Preserve Japanese words faithfully even when mora timing is uneven.",
+    "Do not rewrite particles or conjugations into more native Japanese."
+  ],
+  fr: [
+    "The learner may be a Korean speaker practicing French.",
+    "Preserve intended French words even when liaison or nasal vowels are weak.",
+    "Do not normalize learner grammar into more native French."
+  ]
+};
+
 const buildConversationPolicyParts = (accuracyPolicy?: SessionAccuracyPolicy) => [
   "Prioritize keeping the conversation moving naturally until the topic feels complete.",
   "Respond to the learner's meaning first, then ask one short follow-up that keeps the topic going.",
@@ -96,6 +126,7 @@ export const buildRealtimeTranscriptionConfig = (
 ) => {
   const languageName = REALTIME_LANGUAGE_NAMES[input.language] ?? "the selected target language";
   const transcriptionLanguage = resolveTranscriptionLanguage(input.language);
+  const languageHints = REALTIME_TRANSCRIPTION_HINTS[input.language] ?? [];
 
   return {
     model,
@@ -104,7 +135,8 @@ export const buildRealtimeTranscriptionConfig = (
       `Transcribe the learner faithfully in ${languageName}.`,
       "Preserve hesitations, incomplete phrases, and imperfect grammar.",
       "Do not translate or rewrite the learner's wording.",
-      "Prefer the selected learning language unless the learner clearly switches languages."
+      "Prefer the selected learning language unless the learner clearly switches languages.",
+      ...languageHints
     ].join(" ")
   };
 };

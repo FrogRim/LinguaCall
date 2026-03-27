@@ -129,6 +129,11 @@ export interface StartCallResponse {
   clientSecret: string;
   model: string;
   expiresAt?: string;
+  language: string;
+  exam: string;
+  level: string;
+  topic: string;
+  durationMinutes: number;
 }
 
 export type JoinCallResponse = StartCallResponse;
@@ -139,7 +144,8 @@ export type WebVoiceRuntimeEventType =
   | "media_error"
   | "network_error"
   | "permission_denied"
-  | "participant_left";
+  | "participant_left"
+  | "transcript_filtered";
 
 export interface WebVoiceRuntimeEventPayload {
   event: WebVoiceRuntimeEventType;

@@ -145,6 +145,24 @@ const getResponseDelayMs = (value: string): number => {
   return 150;
 };
 
+const getTargetLanguageDisplay = (language: string): string => {
+  switch (language) {
+    case "de":
+      return "German";
+    case "zh":
+      return "Mandarin Chinese";
+    case "es":
+      return "Spanish";
+    case "ja":
+      return "Japanese";
+    case "fr":
+      return "French";
+    case "en":
+    default:
+      return "English";
+  }
+};
+
 export const startWebVoiceClient = async ({
   apiBase,
   bootstrap,
@@ -199,6 +217,7 @@ export const startWebVoiceClient = async ({
     const delayMs = getResponseDelayMs(userTranscript);
     pendingResponseTimer = setTimeout(() => {
       pendingResponseTimer = null;
+      const targetLanguage = getTargetLanguageDisplay(bootstrap.language);
       try {
         dataChannel.send(JSON.stringify({
           type: "response.create",
@@ -206,8 +225,8 @@ export const startWebVoiceClient = async ({
             modalities: ["audio", "text"],
             instructions:
               assistantTurnCount === 0
-                ? "This is your first reply in the session. Give a brief greeting in the target language, confirm the topic naturally, and ask one easy follow-up question. Keep it to at most two short sentences."
-                : "Continue the conversation naturally. Do not spend the full turn on correction. If you correct, keep it to one brief sentence and then continue with one follow-up question."
+                ? `This is your first reply in the session. Speak only in ${targetLanguage}. Give a brief greeting, confirm the topic "${bootstrap.topic}" naturally, and ask one easy follow-up question that fits ${bootstrap.level} level. Keep it to at most two short sentences.`
+                : `Continue the conversation naturally in ${targetLanguage} about "${bootstrap.topic}". Match approximately ${bootstrap.level} difficulty. Do not spend the full turn on correction. If you correct, keep it to one brief sentence and then continue with one follow-up question.`
           }
         }));
       } catch {
@@ -304,6 +323,10 @@ export const startWebVoiceClient = async ({
             onTranscriptChange
           );
           if (isLowQualityTranscript(transcriptText)) {
+            void notifyRuntimeEvent(apiBase, bootstrap.sessionId, headers, {
+              event: "transcript_filtered",
+              detail: `low_quality_transcript:${transcriptText.length}`
+            }).catch(() => undefined);
             onStateChange?.("live", "Listening for a clearer utterance...");
             return;
           }

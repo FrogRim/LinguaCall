@@ -40,7 +40,12 @@ const buildStartResponse = async (
     connectionMode: "webrtc",
     clientSecret: realtime.clientSecret,
     model: realtime.model,
-    expiresAt: realtime.expiresAt
+    expiresAt: realtime.expiresAt,
+    language,
+    exam,
+    level,
+    topic,
+    durationMinutes
   };
 };
 
