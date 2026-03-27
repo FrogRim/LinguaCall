@@ -163,6 +163,33 @@ const getTargetLanguageDisplay = (language: string): string => {
   }
 };
 
+const buildPreferredAudioConstraints = (): MediaTrackConstraints => ({
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: true,
+  channelCount: 1,
+  sampleRate: { ideal: 48_000 },
+  sampleSize: { ideal: 16 }
+});
+
+const requestMicrophoneStream = async (): Promise<MediaStream> => {
+  try {
+    return await navigator.mediaDevices.getUserMedia({
+      audio: buildPreferredAudioConstraints()
+    });
+  } catch (error) {
+    const shouldFallback =
+      error instanceof DOMException &&
+      (error.name === "OverconstrainedError" || error.name === "TypeError");
+
+    if (!shouldFallback) {
+      throw error;
+    }
+
+    return navigator.mediaDevices.getUserMedia({ audio: true });
+  }
+};
+
 export const startWebVoiceClient = async ({
   apiBase,
   bootstrap,
@@ -173,7 +200,7 @@ export const startWebVoiceClient = async ({
   onStateChange?.("requesting_permission", "Requesting microphone access...");
   let stream: MediaStream;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream = await requestMicrophoneStream();
   } catch (error) {
     const detail = error instanceof Error ? error.message : "microphone_permission_denied";
     await notifyRuntimeEvent(apiBase, bootstrap.sessionId, headers, {
