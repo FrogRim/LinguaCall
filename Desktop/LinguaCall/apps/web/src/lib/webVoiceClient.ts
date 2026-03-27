@@ -99,6 +99,52 @@ const readRealtimeTextParts = (value: unknown): string => {
 const getAssistantRealtimeKey = (payload: Record<string, unknown>): string =>
   String(payload.response_id ?? payload.item_id ?? "assistant");
 
+const normalizeTranscriptForQualityCheck = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const isLowQualityTranscript = (value: string): boolean => {
+  const normalized = normalizeTranscriptForQualityCheck(value);
+  if (!normalized) {
+    return true;
+  }
+
+  const tokens = normalized.split(" ").filter(Boolean);
+  if (tokens.length === 0) {
+    return true;
+  }
+  if (tokens.length === 1 && tokens[0]!.length <= 2) {
+    return true;
+  }
+
+  const fillerLike = /^(uh+|um+|mm+|hmm+|ah+|eh+|er+|음+|어+|아+|응+|え+|あ+|うー+|えー+|嗯+|啊+|呃+)$/u;
+  if (tokens.every((token) => fillerLike.test(token))) {
+    return true;
+  }
+
+  const uniqueTokens = new Set(tokens);
+  if (tokens.length >= 3 && uniqueTokens.size === 1) {
+    return true;
+  }
+
+  return false;
+};
+
+const getResponseDelayMs = (value: string): number => {
+  const normalized = normalizeTranscriptForQualityCheck(value);
+  const tokenCount = normalized ? normalized.split(" ").filter(Boolean).length : 0;
+  if (tokenCount <= 3) {
+    return 650;
+  }
+  if (tokenCount <= 8) {
+    return 350;
+  }
+  return 150;
+};
+
 export const startWebVoiceClient = async ({
   apiBase,
   bootstrap,
@@ -138,12 +184,44 @@ export const startWebVoiceClient = async ({
   const finalizedAssistantKeys = new Set<string>();
   let finalized = false;
   let connectedAt: string | undefined;
+  let pendingResponseTimer: ReturnType<typeof setTimeout> | null = null;
+  let assistantTurnCount = 0;
+
+  const clearPendingResponseTimer = () => {
+    if (pendingResponseTimer) {
+      clearTimeout(pendingResponseTimer);
+      pendingResponseTimer = null;
+    }
+  };
+
+  const queueAssistantResponse = (userTranscript: string) => {
+    clearPendingResponseTimer();
+    const delayMs = getResponseDelayMs(userTranscript);
+    pendingResponseTimer = setTimeout(() => {
+      pendingResponseTimer = null;
+      try {
+        dataChannel.send(JSON.stringify({
+          type: "response.create",
+          response: {
+            modalities: ["audio", "text"],
+            instructions:
+              assistantTurnCount === 0
+                ? "This is your first reply in the session. Give a brief greeting in the target language, confirm the topic naturally, and ask one easy follow-up question. Keep it to at most two short sentences."
+                : "Continue the conversation naturally. Do not spend the full turn on correction. If you correct, keep it to one brief sentence and then continue with one follow-up question."
+          }
+        }));
+      } catch {
+        // best effort only
+      }
+    }, delayMs);
+  };
 
   const finalize = async (payload: CompleteWebVoiceCallPayload, nextState: WebVoiceClientState) => {
     if (finalized) {
       return;
     }
     finalized = true;
+    clearPendingResponseTimer();
     onStateChange?.("ending", "Finishing live session...");
     let completionFailed = false;
     try {
@@ -194,6 +272,7 @@ export const startWebVoiceClient = async ({
 
         finalizedAssistantKeys.add(key);
         assistantBuffers.delete(key);
+        assistantTurnCount += 1;
         pushTranscript(
           transcript,
           {
@@ -205,6 +284,11 @@ export const startWebVoiceClient = async ({
           onTranscriptChange
         );
       };
+
+      if (eventType === "input_audio_buffer.speech_started") {
+        clearPendingResponseTimer();
+        return;
+      }
 
       if (eventType === "conversation.item.input_audio_transcription.completed") {
         const transcriptText = String(payload.transcript ?? "").trim();
@@ -219,6 +303,11 @@ export const startWebVoiceClient = async ({
             },
             onTranscriptChange
           );
+          if (isLowQualityTranscript(transcriptText)) {
+            onStateChange?.("live", "Listening for a clearer utterance...");
+            return;
+          }
+          queueAssistantResponse(transcriptText);
         }
         return;
       }

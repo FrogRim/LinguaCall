@@ -24,8 +24,10 @@ describe("buildInstructions", () => {
 
     expect(instructions).toContain("Conduct the entire conversation only in English.");
     expect(instructions).toContain("Open the session with the first sentence in English.");
+    expect(instructions).toContain("On your first reply, give a short greeting");
     expect(instructions).toContain("Do not correct every turn.");
     expect(instructions).toContain("Favor conversation flow over pronunciation coaching.");
+    expect(instructions).toContain("Never spend the full turn on pronunciation drilling.");
     expect(instructions).toContain("daily conversation");
     expect(instructions).toContain("IM3");
   });
@@ -135,8 +137,8 @@ describe("buildInstructions", () => {
     expect(buildRealtimeTurnDetectionConfig()).toEqual({
       type: "semantic_vad",
       eagerness: "low",
-      create_response: true,
-      interrupt_response: true
+      create_response: false,
+      interrupt_response: false
     });
   });
 });

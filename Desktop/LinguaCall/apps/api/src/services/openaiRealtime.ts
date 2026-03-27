@@ -72,10 +72,13 @@ const REALTIME_LANGUAGE_NAMES: Record<string, string> = {
 const buildConversationPolicyParts = (accuracyPolicy?: SessionAccuracyPolicy) => [
   "Prioritize keeping the conversation moving naturally until the topic feels complete.",
   "Respond to the learner's meaning first, then ask one short follow-up that keeps the topic going.",
+  "On your first reply, give a short greeting, confirm the topic naturally, and ask one easy question.",
   "Do not correct every turn.",
   "Favor conversation flow over pronunciation coaching.",
   "Only give a brief correction when the mistake blocks comprehension, repeats several times, or there is a natural pause.",
   "If you correct, place the correction after your response instead of before it.",
+  "Never spend the full turn on pronunciation drilling.",
+  "When you correct, limit it to one brief sentence and then continue the conversation.",
   `Use at most ${accuracyPolicy?.maxAssistantSentences ?? 3} short sentences per turn.`,
   `Ask at most ${accuracyPolicy?.maxAssistantQuestionsPerTurn ?? 1} question per turn.`,
   "Speak slightly slower than natural conversational speed and leave a short pause between sentences.",
@@ -109,8 +112,8 @@ export const buildRealtimeTranscriptionConfig = (
 export const buildRealtimeTurnDetectionConfig = () => ({
   type: "semantic_vad" as const,
   eagerness: "low" as const,
-  create_response: true,
-  interrupt_response: true
+  create_response: false,
+  interrupt_response: false
 });
 
 const buildGermanInstructions = (input: CreateOpenAIRealtimeSessionInput) => {
