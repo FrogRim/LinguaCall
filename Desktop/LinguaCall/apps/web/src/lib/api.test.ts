@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { apiClient } from "./api";
+import { apiClient, describeApiError, normalizeApiError } from "./api";
 
 test("apiClient sends credentialed requests even without a bearer token", async () => {
   let captured: RequestInit | undefined;
@@ -129,4 +129,19 @@ test("apiClient accepts ok responses whose data is explicitly null", async () =>
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("normalizeApiError preserves Error messages", () => {
+  const normalized = normalizeApiError(new Error("failed_to_sync_supabase_identity"));
+  assert.deepEqual(normalized, {
+    code: "validation_error",
+    message: "failed_to_sync_supabase_identity"
+  });
+});
+
+test("describeApiError surfaces plain Error messages instead of api_error", () => {
+  assert.equal(
+    describeApiError(new Error("supabase phone provider is disabled"), "phone_start"),
+    "supabase phone provider is disabled"
+  );
 });

@@ -6,6 +6,18 @@ export function normalizeApiError(error: unknown): ApiError {
   if (error && typeof error === 'object' && 'code' in error && 'message' in error) {
     return error as ApiError;
   }
+  if (error instanceof Error) {
+    return {
+      code: 'validation_error',
+      message: error.message || 'request failed'
+    };
+  }
+  if (typeof error === 'string' && error.trim().length > 0) {
+    return {
+      code: 'validation_error',
+      message: error.trim()
+    };
+  }
   return { code: 'validation_error', message: 'api_error' };
 }
 
