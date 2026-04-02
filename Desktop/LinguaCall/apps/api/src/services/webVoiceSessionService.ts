@@ -20,6 +20,15 @@ const buildStartResponse = async (
   status: StartCallResponse["status"],
   accuracyPolicy?: SessionAccuracyPolicy
 ): Promise<StartCallResponse> => {
+  const recentErrorPatterns = await store.getRecentGrammarErrors(clerkUserId, language, 1).catch((err: unknown) => {
+    console.error("[webVoice] getRecentGrammarErrors failed — falling back to empty error patterns", {
+      sessionId,
+      language,
+      error: err instanceof Error ? err.message : String(err)
+    });
+    return [];
+  });
+
   const realtime = await createOpenAIRealtimeSession({
     sessionId,
     callId,
@@ -29,7 +38,8 @@ const buildStartResponse = async (
     topic,
     level,
     durationMinutes,
-    accuracyPolicy
+    accuracyPolicy,
+    recentErrorPatterns
   });
 
   return {

@@ -278,6 +278,18 @@ You are an expert OPIC (Oral Proficiency Interview by Computer) examiner evaluat
 Rubric levels: NL (Novice Low) → NM → NH → IL → IM1 → IM2 → IM3 → IH → AL (Advanced Low).
 Exam: ${exam.toUpperCase()}, Topic: "${topic}".
 
+Scoring calibration anchors — use these to calibrate your numeric scores:
+- grammar_score 90+: Near-native accuracy; only isolated slips (e.g., missing article once).
+- grammar_score 70: Noticeable errors (wrong tense 2–3 times) but the message is always clear.
+- grammar_score 50: Frequent errors that sometimes impede comprehension.
+- grammar_score 30: Most sentences contain errors that obscure meaning.
+- vocabulary_score 90+: Accurate topic-specific vocabulary; varied and natural expression throughout.
+- vocabulary_score 70: Common vocabulary only; occasional wrong word choice.
+- vocabulary_score 50: Limited range; frequent circumlocution or vocabulary gaps.
+- fluency_score 90+: Natural pace, minimal fillers, connected speech throughout.
+- fluency_score 70: Noticeable hesitations or slow pace but speech remains continuous.
+- fluency_score 50: Long pauses or repetitions that disrupt comprehension.
+
 Evaluate the transcript and return a JSON object with EXACTLY these fields:
 {
   "grammar_score": <0-100 integer, based on grammatical accuracy>,
@@ -301,6 +313,18 @@ const buildGermanEvalPrompt = (topic: string): string => `
 Du bist ein Experte für die Goethe-Zertifikat B2 Sprechprüfung und bewertest eine deutschsprachige Übungssitzung.
 Bewertungskriterien nach Goethe B2 Sprechen: Inhalt, Interaktion, Aussprache/Intonation, Grammatik, Wortschatz.
 Thema: "${topic}".
+
+Kalibrierungsanker für die Bewertung — nutze diese zur Einordnung deiner Zahlenwerte:
+- grammar_score 90+: Nahezu muttersprachliche Genauigkeit; nur vereinzelte Fehler (z.B. einmal falscher Artikel).
+- grammar_score 70: Erkennbare Fehler (2–3 falsche Tempora) aber die Aussage bleibt stets verständlich.
+- grammar_score 50: Häufige Fehler, die das Verständnis manchmal beeinträchtigen.
+- grammar_score 30: In den meisten Sätzen Fehler, die die Bedeutung verschleiern.
+- vocabulary_score 90+: Präziser themenbezogener Wortschatz; abwechslungsreicher Ausdruck.
+- vocabulary_score 70: Nur Grundwortschatz; gelegentlich falsche Wortwahl.
+- vocabulary_score 50: Begrenztes Spektrum; häufiges Umschreiben oder Lücken.
+- fluency_score 90+: Natürliches Sprechtempo, wenige Füllwörter, flüssige Rede.
+- fluency_score 70: Auffällige Pausen oder langsames Tempo, aber kontinuierlicher Redefluss.
+- fluency_score 50: Lange Pausen oder Wiederholungen, die das Verständnis stören.
 
 Bewerte das Transkript und gib ein JSON-Objekt mit GENAU diesen Feldern zurück:
 {
@@ -326,6 +350,18 @@ const buildChineseEvalPrompt = (topic: string): string => `
 评分标准（HSK 5口语）：语音语调、词汇量、语法准确性、话题表达、连贯性。
 话题："${topic}"。
 
+评分校准基准——请用以下标准校准你的数字评分：
+- grammar_score 90+：接近母语者的准确度；仅有个别错误（例如偶尔误用量词一次）。
+- grammar_score 70：有明显错误（如错误时态2–3次），但表意始终清晰。
+- grammar_score 50：频繁错误，有时影响理解。
+- grammar_score 30：大多数句子含有遮蔽意义的错误。
+- vocabulary_score 90+：准确使用话题相关词汇；表达丰富自然。
+- vocabulary_score 70：仅使用常见词汇；偶有用词不当。
+- vocabulary_score 50：词汇范围有限；频繁迂回表达或出现词汇空缺。
+- fluency_score 90+：语速自然，填充词极少，全程语流连贯。
+- fluency_score 70：有明显停顿或语速偏慢，但语流持续。
+- fluency_score 50：长时间停顿或重复，影响理解。
+
 请评估以下对话记录，并返回一个包含以下字段的JSON对象：
 {
   "grammar_score": <0-100整数，语法准确性>,
@@ -349,6 +385,18 @@ const buildSpanishEvalPrompt = (topic: string): string => `
 Eres un experto examinador del DELE B1 Expresión e Interacción Orales y evalúas una sesión de práctica en español.
 Criterios DELE B1 Oral: coherencia y cohesión, riqueza léxica, corrección gramatical, pronunciación, adecuación al tema.
 Tema: "${topic}".
+
+Anclas de calibración de puntuación — usa estas para calibrar tus valores numéricos:
+- grammar_score 90+: Precisión casi nativa; solo errores aislados (ej. un artículo incorrecto).
+- grammar_score 70: Errores notorios (tiempo verbal incorrecto 2–3 veces) pero el mensaje siempre es claro.
+- grammar_score 50: Errores frecuentes que a veces dificultan la comprensión.
+- grammar_score 30: La mayoría de las oraciones contienen errores que oscurecen el significado.
+- vocabulary_score 90+: Vocabulario temático preciso; expresión variada y natural.
+- vocabulary_score 70: Solo vocabulario común; elección de palabras incorrecta ocasionalmente.
+- vocabulary_score 50: Rango limitado; circunlocución frecuente o lagunas léxicas.
+- fluency_score 90+: Ritmo natural, mínimos rellenos verbales, discurso continuo.
+- fluency_score 70: Pausas notables o ritmo lento pero el discurso es continuo.
+- fluency_score 50: Pausas largas o repeticiones que interrumpen la comprensión.
 
 Evalúa la transcripción y devuelve un objeto JSON con EXACTAMENTE estos campos:
 {
@@ -374,6 +422,18 @@ const buildJapaneseEvalPrompt = (topic: string): string => `
 評価基準（JLPT N2スピーキング）：文法の正確さ、語彙の豊富さ、流暢さ・発音・リズム、トピックへの対応力。
 トピック：「${topic}」。
 
+採点キャリブレーション基準 — 数値スコアの校正にこれらを使用してください：
+- grammar_score 90+：ほぼネイティブレベルの正確さ；散発的なミスのみ（例：助詞の誤り1回）。
+- grammar_score 70：目立つ誤り（時制や活用ミス2〜3回）があるが、意図は常に明確。
+- grammar_score 50：頻繁な誤りがあり、理解を妨げることがある。
+- grammar_score 30：ほとんどの文に意味を曖昧にする誤りがある。
+- vocabulary_score 90+：トピック関連語彙を正確に使用；表現が豊かで自然。
+- vocabulary_score 70：一般的な語彙のみ；時折誤った語選択がある。
+- vocabulary_score 50：語彙範囲が限定的；頻繁な言い換えや語彙の空白がある。
+- fluency_score 90+：自然なペース、フィラーが少なく、全体を通じて流暢。
+- fluency_score 70：目立つ間や遅いペースがあるが、発話は継続している。
+- fluency_score 50：長い間や繰り返しが理解を妨げる。
+
 以下のフィールドを含むJSONオブジェクトを返してください：
 {
   "grammar_score": <0-100の整数、文法の正確さ>,
@@ -397,6 +457,18 @@ const buildFrenchEvalPrompt = (topic: string): string => `
 Tu es un expert de l'examen DELF B1 Expression et Interaction Orales et tu evalues une session de pratique en francais.
 Criteres DELF B1 Oral : coherence et cohesion, richesse lexicale, correction grammaticale, prononciation, adequation au sujet.
 Sujet : "${topic}".
+
+Ancres de calibration des scores — utilise-les pour calibrer tes valeurs numeriques :
+- grammar_score 90+ : Precision quasi native ; seulement des erreurs isolees (ex. un article incorrect).
+- grammar_score 70 : Erreurs notables (mauvais temps 2-3 fois) mais le message est toujours clair.
+- grammar_score 50 : Erreurs frequentes qui nuisent parfois a la comprehension.
+- grammar_score 30 : La plupart des phrases contiennent des erreurs qui obscurcissent le sens.
+- vocabulary_score 90+ : Vocabulaire thematique precis ; expression variee et naturelle.
+- vocabulary_score 70 : Vocabulaire courant uniquement ; choix de mots incorrects occasionnellement.
+- vocabulary_score 50 : Registre limite ; periphrase frequente ou lacunes lexicales.
+- fluency_score 90+ : Rythme naturel, peu de marqueurs d'hesitation, discours continu.
+- fluency_score 70 : Pauses notables ou rythme lent mais le discours reste continu.
+- fluency_score 50 : Longues pauses ou repetitions qui perturbent la comprehension.
 
 Retourne un objet JSON avec EXACTEMENT ces champs :
 {

@@ -1400,6 +1400,31 @@ class InMemoryStore {
     return result.rows.map((row) => this.mapSession(row));
   }
 
+  async getRecentGrammarErrors(clerkUserId: ClerkUserId, language: string, limit: number): Promise<string[]> {
+    const user = await this.getUser(clerkUserId);
+    const result = await this.pool.query<{ grammar_corrections: unknown }>(
+      `
+        SELECT e.grammar_corrections
+        FROM evaluations e
+        JOIN sessions s ON s.id = e.session_id
+        WHERE s.user_id = $1
+          AND s.language = $2
+          AND s.status = 'completed'
+        ORDER BY s.created_at DESC
+        LIMIT $3
+      `,
+      [user.id, language, limit]
+    );
+    return result.rows
+      .flatMap((row) => {
+        if (!Array.isArray(row.grammar_corrections)) return [];
+        return (row.grammar_corrections as Array<Record<string, unknown>>)
+          .map((entry) => (typeof entry?.issue === "string" ? entry.issue.trim() : ""))
+          .filter(Boolean);
+      })
+      .slice(0, 5);
+  }
+
   async listBillingPlans(): Promise<BillingPlan[]> {
     const result = await this.pool.query<DbPlanRow>(
       `
