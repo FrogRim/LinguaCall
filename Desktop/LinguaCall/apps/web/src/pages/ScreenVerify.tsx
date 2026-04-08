@@ -75,12 +75,12 @@ export default function ScreenVerify() {
     >
       <CardContent className="space-y-8 px-8 py-8 sm:px-10 sm:py-10">
         <div className="space-y-3">
-          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             <ShieldCheck className="h-3.5 w-3.5" />
             Secure session
           </div>
           <div>
-            <h2 className="text-3xl font-semibold tracking-[-0.05em] text-slate-950">
+            <h2 className="text-3xl font-semibold tracking-tight text-foreground">
               {showOtp ? t('verify.confirmCode') : t('verify.sendCode')}
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -89,11 +89,11 @@ export default function ScreenVerify() {
           </div>
         </div>
 
-        <div className="grid gap-3 rounded-[28px] border border-slate-200 bg-slate-50/80 p-4 sm:grid-cols-2">
-          <div className={`rounded-2xl px-4 py-3 text-sm ${showOtp ? 'bg-white text-slate-500' : 'bg-slate-950 text-white'}`}>
+        <div className="grid gap-3 rounded-xl border border-border bg-secondary p-4 sm:grid-cols-2">
+          <div className={`rounded-lg px-4 py-3 text-sm ${showOtp ? 'bg-card text-muted-foreground' : 'bg-foreground text-background'}`}>
             1. {t('verify.phoneLabel')}
           </div>
-          <div className={`rounded-2xl px-4 py-3 text-sm ${showOtp ? 'bg-slate-950 text-white' : 'bg-white text-slate-500'}`}>
+          <div className={`rounded-lg px-4 py-3 text-sm ${showOtp ? 'bg-foreground text-background' : 'bg-card text-muted-foreground'}`}>
             2. {t('verify.otpLabel')}
           </div>
         </div>
@@ -103,7 +103,7 @@ export default function ScreenVerify() {
             <Label htmlFor="phone">{t('verify.phoneLabel')}</Label>
             <Input
               id="phone"
-              className="h-12 rounded-2xl"
+              className="h-11 rounded-xl"
               value={phone}
               onChange={e => setPhone(e.target.value)}
               placeholder={t('verify.phonePlaceholder')}
@@ -132,7 +132,7 @@ export default function ScreenVerify() {
                 <Label htmlFor="otp">{t('verify.otpLabel')}</Label>
                 <Input
                   id="otp"
-                  className="h-12 rounded-2xl text-center text-lg tracking-[0.4em]"
+                  className="h-11 rounded-xl text-center text-lg tracking-[0.4em]"
                   value={otp}
                   onChange={e => setOtp(e.target.value)}
                   placeholder={t('verify.otpPlaceholder')}
