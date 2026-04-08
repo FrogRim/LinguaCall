@@ -431,13 +431,15 @@ export default function ScreenSession() {
         timezone: 'Asia/Seoul'
       };
       const session = await api.post<Session>('/sessions', payload);
-      setFormMessage(
-        session.contactMode === 'scheduled_once'
-          ? `scheduled session created for ${formatSessionTime(session.scheduledForAtUtc)}`
-          : 'session created. Start the call when ready.'
-      );
       setDetail({ kind: 'idle' });
       await Promise.all([loadSessions(), loadAccountState()]);
+      if (session.contactMode === 'scheduled_once') {
+        setFormMessage(`scheduled session created for ${formatSessionTime(session.scheduledForAtUtc)}`);
+        historyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        setFormMessage(isKo ? '세션을 생성했습니다. 통화를 시작합니다...' : 'Session created. Starting call...');
+        void beginWebVoiceSession(session.id, false);
+      }
     } catch (err) {
       setFormError(describeApiError(err, 'session_create'));
     } finally {
@@ -543,8 +545,6 @@ export default function ScreenSession() {
     }
   };
 
-  const nextScheduledSession = sessions.find(session => session.status === 'scheduled');
-  const recentCompletedSession = sessions.find(session => session.status === 'completed');
   const activePlanDetails = plans.find(plan => plan.code === profile?.planCode) ?? null;
   const bannerTone = globalMessage.includes('failed') || globalMessage.includes('error') ? 'danger' : 'neutral';
 
@@ -566,16 +566,6 @@ export default function ScreenSession() {
         eyebrow={copy.session.eyebrow}
         title={copy.session.title}
         description={copy.session.description}
-        actions={
-          <>
-            <Button size="lg" onClick={() => composerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-              {isKo ? '지금 세션 만들기' : 'Create a session now'}
-            </Button>
-            <Button size="lg" variant="outline" onClick={() => historyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-              {isKo ? '최근 세션 보기' : 'View recent sessions'}
-            </Button>
-          </>
-        }
         aside={
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
             <MetricCard
@@ -738,32 +728,6 @@ export default function ScreenSession() {
         </div>
 
         <div className="space-y-6">
-          <SectionCard title={copy.session.quickActionsTitle} description={copy.session.description}>
-            <div className="grid gap-3">
-              <QuickActionCard
-                title={copy.session.quickActions[0].title}
-                description={copy.session.quickActions[0].description}
-                cta={isKo ? '새 세션 열기' : 'Open the form'}
-                onClick={() => composerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-              />
-              <QuickActionCard
-                title={copy.session.quickActions[1].title}
-                description={nextScheduledSession?.scheduledForAtUtc
-                  ? `${copy.session.quickActions[1].description} ${formatSessionTime(nextScheduledSession.scheduledForAtUtc)}`
-                  : copy.session.quickActions[1].description}
-                cta={isKo ? '예약 보기' : 'View schedule'}
-                onClick={() => historyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-              />
-              <QuickActionCard
-                title={copy.session.quickActions[2].title}
-                description={copy.session.quickActions[2].description}
-                cta={isKo ? '리포트 열기' : 'Open report'}
-                disabled={!recentCompletedSession}
-                onClick={() => recentCompletedSession ? void handleViewReport(recentCompletedSession.id) : undefined}
-              />
-            </div>
-          </SectionCard>
-
           <div ref={detailRef}>
             <SectionCard title={copy.session.detailTitle} description={copy.session.detailDescription}>
               <DetailPanel
@@ -947,31 +911,6 @@ function LiveSessionCard({
   );
 }
 
-function QuickActionCard({
-  title,
-  description,
-  cta,
-  onClick,
-  disabled
-}: {
-  title: string;
-  description: string;
-  cta: string;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
-      <div className="space-y-2">
-        <h3 className="text-base font-semibold tracking-tight text-slate-950">{title}</h3>
-        <p className="text-sm leading-6 text-muted-foreground">{description}</p>
-      </div>
-      <Button className="mt-4" variant={disabled ? 'secondary' : 'outline'} disabled={disabled} onClick={onClick}>
-        {cta}
-      </Button>
-    </div>
-  );
-}
 
 function SessionRow({
   session,
