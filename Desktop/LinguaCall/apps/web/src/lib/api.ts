@@ -101,5 +101,9 @@ export function apiClient(
     return request<T>(url, {});
   }
 
-  return { post, patch, get, headers: h, base: API_BASE };
+  async function del(url: string): Promise<void> {
+    return request<void>(url, { method: 'DELETE' });
+  }
+
+  return { post, patch, get, delete: del, headers: h, base: API_BASE };
 }

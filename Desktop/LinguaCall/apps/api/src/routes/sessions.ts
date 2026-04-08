@@ -274,6 +274,28 @@ router.post("/:id/cancel", requireAuthenticatedUser, async (req: AuthenticatedRe
   }
 });
 
+router.delete("/:id", requireAuthenticatedUser, async (req: AuthenticatedRequest, res: Response<ApiResponse<null>>) => {
+  const { id } = req.params;
+  if (!id) {
+    res.status(422).json({ ok: false, error: { code: "validation_error", message: "session id required" } });
+    return;
+  }
+  try {
+    await learningSessionsRepository.delete(req.clerkUserId, id);
+    res.json({ ok: true, data: null });
+  } catch (err) {
+    if (err instanceof AppError && err.code === "SESSION_NOT_FOUND") {
+      res.status(404).json({ ok: false, error: { code: "not_found", message: err.message } });
+      return;
+    }
+    if (err instanceof AppError && err.code === "INVALID_SESSION_STATE") {
+      res.status(409).json({ ok: false, error: { code: "conflict", message: err.message } });
+      return;
+    }
+    withError(res, "failed_to_delete_session");
+  }
+});
+
 export default router;
 
 

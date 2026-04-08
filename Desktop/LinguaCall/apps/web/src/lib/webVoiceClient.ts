@@ -16,15 +16,24 @@ export type WebVoiceClientState =
 export type WebVoiceClientController = {
   end: (endReason?: string) => Promise<void>;
   getTranscript: () => WebVoiceTranscriptSegment[];
+  startSpeaking: () => void;
+  stopSpeaking: () => void;
 };
 
 type StartWebVoiceClientOptions = {
   apiBase: string;
   bootstrap: StartCallResponse;
   headers: Record<string, string>;
+  pttMode?: boolean;
+  earlyExitKeywords?: string[];
+  onEarlyExit?: () => void;
   onStateChange?: (state: WebVoiceClientState, message?: string) => void;
   onTranscriptChange?: (transcript: WebVoiceTranscriptSegment[]) => void;
 };
+
+import { buildGreetingPayload, buildPttSessionUpdate, matchesEarlyExitKeyword } from "./pttHelpers";
+export { buildGreetingPayload, buildPttSessionUpdate, matchesEarlyExitKeyword } from "./pttHelpers";
+export type { GreetingPayload, PttSessionUpdate } from "./pttHelpers";
 
 const postJson = async <T>(
   apiBase: string,
@@ -206,6 +215,9 @@ export const startWebVoiceClient = async ({
   apiBase,
   bootstrap,
   headers,
+  pttMode = false,
+  earlyExitKeywords = [],
+  onEarlyExit,
   onStateChange,
   onTranscriptChange
 }: StartWebVoiceClientOptions): Promise<WebVoiceClientController> => {
@@ -229,6 +241,10 @@ export const startWebVoiceClient = async ({
     }).catch(() => undefined);
     onStateChange?.("failed", "Microphone access was denied.");
     throw error;
+  }
+  // PTT: start with mic muted so the user controls when audio is sent
+  if (pttMode) {
+    stream.getTracks().forEach(t => { t.enabled = false; });
   }
 
   const peer = new RTCPeerConnection();
@@ -317,6 +333,16 @@ export const startWebVoiceClient = async ({
     connectedAt = new Date().toISOString();
     onStateChange?.("live", "Live session connected.");
     await notifyRuntimeEvent(apiBase, bootstrap.sessionId, headers, { event: "connected" }).catch(() => undefined);
+    try {
+      if (pttMode) {
+        dataChannel.send(JSON.stringify(buildPttSessionUpdate()));
+      } else {
+        const greeting = buildGreetingPayload(false);
+        if (greeting) dataChannel.send(JSON.stringify(greeting));
+      }
+    } catch {
+      // best effort only
+    }
   });
 
   dataChannel.addEventListener("message", (event) => {
@@ -371,6 +397,11 @@ export const startWebVoiceClient = async ({
             },
             onTranscriptChange
           );
+          if (earlyExitKeywords.length > 0 && matchesEarlyExitKeyword(transcriptText, earlyExitKeywords)) {
+            onEarlyExit?.();
+            void finalize({ endReason: "user_requested_end", endedAt: new Date().toISOString() }, "ended");
+            return;
+          }
           queueAssistantResponse(transcriptText);
         }
         return;
@@ -517,6 +548,20 @@ export const startWebVoiceClient = async ({
         "ended"
       );
     },
-    getTranscript: () => [...transcript]
+    getTranscript: () => [...transcript],
+    startSpeaking: () => {
+      stream.getTracks().forEach(t => { t.enabled = true; });
+    },
+    stopSpeaking: () => {
+      stream.getTracks().forEach(t => { t.enabled = false; });
+      if (dataChannel.readyState === "open") {
+        try {
+          dataChannel.send(JSON.stringify({ type: "input_audio_buffer.commit" }));
+          dataChannel.send(JSON.stringify({ type: "response.create" }));
+        } catch {
+          // best effort
+        }
+      }
+    }
   };
 };

@@ -42,6 +42,7 @@ type ActiveWebVoiceSession = {
   transcript: string[];
   controller: WebVoiceClientController | null;
   note?: string;
+  isSpeaking: boolean;
 };
 
 const ACTIVE_SESSION_STATUSES = ['connecting', 'dialing', 'ringing', 'in_progress', 'ending'];
@@ -308,6 +309,18 @@ export default function ScreenSession() {
     setActiveSession(next ? { ...next } : null);
   };
 
+  const TERMINAL_STATUSES = ['completed', 'cancelled', 'failed', 'no_answer', 'user_cancelled', 'provider_error', 'schedule_missed'];
+
+  const handleDelete = async (sessionId: string) => {
+    const api = makeApi();
+    try {
+      await api.delete(`/sessions/${sessionId}`);
+      await loadSessions(false);
+    } catch (err) {
+      setGlobalMessage(describeApiError(err, 'session_delete'));
+    }
+  };
+
   const beginWebVoiceSession = async (sessionId: string, join: boolean) => {
     if (activeRef.current?.controller) {
       setGlobalMessage('another live session is already active.');
@@ -320,7 +333,8 @@ export default function ScreenSession() {
       state: 'connecting',
       transcript: [],
       controller: null,
-      note: 'Preparing live audio session...'
+      note: 'Preparing live audio session...',
+      isSpeaking: false
     };
     syncActive(initial);
 
@@ -333,6 +347,19 @@ export default function ScreenSession() {
         apiBase: API_BASE,
         bootstrap: bootstrap as StartCallResponse,
         headers: await api.headers(),
+        pttMode: true,
+        earlyExitKeywords: [
+          '끝내자', '그만하자', '종료', '세션 종료', '종료할게', '그만할게',
+          "let's finish", "let's stop", "end session", "stop session", "finish", "goodbye", "that's all",
+          "terminemos", "finalizar", "fin de sesión",
+          "arrêtons", "terminer", "fin de session",
+          "beenden wir", "sitzung beenden", "schluss",
+          "終わりにしよう", "セッション終了", "やめよう",
+          "结束吧", "结束会话", "好了"
+        ],
+        onEarlyExit: () => {
+          setGlobalMessage(isKo ? '종료 키워드가 감지되어 세션을 종료합니다.' : 'Exit keyword detected. Ending session.');
+        },
         onStateChange: (state, message) => {
           if (!activeRef.current || activeRef.current.sessionId !== sessionId) return;
           syncActive({ ...activeRef.current, state, note: message });
@@ -574,6 +601,16 @@ export default function ScreenSession() {
               description={copy.session.liveDescription}
               activeSession={activeSession}
               onEnd={() => void handleEndCall(activeSession.sessionId)}
+              onTogglePtt={() => {
+                if (!activeRef.current?.controller) return;
+                if (activeRef.current.isSpeaking) {
+                  activeRef.current.controller.stopSpeaking();
+                  syncActive({ ...activeRef.current, isSpeaking: false });
+                } else {
+                  activeRef.current.controller.startSpeaking();
+                  syncActive({ ...activeRef.current, isSpeaking: true });
+                }
+              }}
               isKo={isKo}
             />
           )}
@@ -783,6 +820,7 @@ export default function ScreenSession() {
                 onJoin={() => void beginWebVoiceSession(session.id, true)}
                 onCancel={() => void handleCancel(session.id)}
                 onEnd={() => void handleEndCall(session.id)}
+                onDelete={() => void handleDelete(session.id)}
                 onViewReport={() => void handleViewReport(session.id)}
                 onViewTranscript={() => void handleViewTranscript(session.id)}
                 t={t}
@@ -801,14 +839,17 @@ function LiveSessionCard({
   description,
   activeSession,
   onEnd,
+  onTogglePtt,
   isKo
 }: {
   title: string;
   description: string;
   activeSession: ActiveWebVoiceSession;
   onEnd: () => void;
+  onTogglePtt?: () => void;
   isKo: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <SectionCard title={title} description={description}>
       <div className="space-y-4 rounded-[28px] border border-primary/15 bg-primary/[0.05] px-5 py-5">
@@ -834,6 +875,21 @@ function LiveSessionCard({
           <div className="rounded-3xl border border-dashed border-white/90 bg-white/70 px-4 py-5 text-sm text-muted-foreground">
             {isKo ? '첫 transcript가 들어오면 여기에 바로 표시됩니다.' : 'The first transcript line will appear here.'}
           </div>
+        )}
+
+        {activeSession.state === 'live' && activeSession.controller && onTogglePtt && (
+          <Button
+            size="lg"
+            className="w-full"
+            variant={activeSession.isSpeaking ? 'default' : 'outline'}
+            onClick={onTogglePtt}
+          >
+            {activeSession.isSpeaking ? (
+              <><span className="mr-2 h-2 w-2 rounded-full bg-primary-foreground animate-pulse inline-block" />{t('session.pttStop')}</>
+            ) : (
+              t('session.pttStart')
+            )}
+          </Button>
         )}
 
         <Button variant="destructive" onClick={onEnd}>
@@ -879,6 +935,7 @@ function SessionRow({
   onJoin,
   onCancel,
   onEnd,
+  onDelete,
   onViewReport,
   onViewTranscript,
   t,
@@ -892,6 +949,7 @@ function SessionRow({
   onJoin: () => void;
   onCancel: () => void;
   onEnd: () => void;
+  onDelete?: () => void;
   onViewReport: () => void;
   onViewTranscript: () => void;
   t: (key: string, options?: Record<string, unknown>) => string;
@@ -954,6 +1012,11 @@ function SessionRow({
           {session.callId && session.status !== 'completed' && (
             <Button size="sm" variant="ghost" onClick={onViewTranscript}>
               {t('session.viewTranscript')}
+            </Button>
+          )}
+          {onDelete && ['completed', 'cancelled', 'failed', 'no_answer', 'user_cancelled', 'provider_error', 'schedule_missed'].includes(session.status) && (
+            <Button size="sm" variant="ghost" onClick={onDelete} title={isKo ? '삭제' : 'Delete'}>
+              🗑
             </Button>
           )}
         </div>

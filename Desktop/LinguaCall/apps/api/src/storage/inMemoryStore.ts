@@ -3330,6 +3330,23 @@ class InMemoryStore {
     }
   }
 
+  async deleteSession(clerkUserId: ClerkUserId, sessionId: string): Promise<void> {
+    const user = await this.getUser(clerkUserId);
+    const result = await this.pool.query<DbSessionRow>(
+      "SELECT * FROM sessions WHERE id = $1 AND user_id = $2 LIMIT 1",
+      [sessionId, user.id]
+    );
+    if (result.rows.length === 0) {
+      throw new AppError(DB_ERROR.SESSION_NOT_FOUND, "session not found");
+    }
+    const session = result.rows[0];
+    const deletableStatuses = ["completed", "cancelled", "failed", "no_answer", "user_cancelled", "provider_error", "schedule_missed"];
+    if (!deletableStatuses.includes(session.status)) {
+      throw new AppError(DB_ERROR.INVALID_SESSION_STATE, `cannot delete session with status: ${session.status}`);
+    }
+    await this.pool.query("DELETE FROM sessions WHERE id = $1", [sessionId]);
+  }
+
   async dispatchDueScheduledSessions(
     limit = 1,
     options: OutboundCallOptions = {}

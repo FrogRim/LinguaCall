@@ -4,24 +4,60 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Base surfaces — warm neutral (design-tokens: --bg-primary #fcfcfb, --surface-primary #fff) */
+    --background: 40 20% 99%;
+    --foreground: 0 0% 9%;
+
+    /* Card surface */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --primary: 243 75% 59%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --card-foreground: 0 0% 9%;
+
+    /* Primary brand — design-tokens: --accent-brand #2f5bea */
+    --primary: 224 82% 56%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary / muted surfaces — design-tokens: --surface-secondary #f8f7f5 */
+    --secondary: 40 14% 96%;
+    --secondary-foreground: 0 0% 9%;
+
+    --muted: 40 14% 96%;
+    --muted-foreground: 30 5% 45%;
+
+    --accent: 40 14% 96%;
+    --accent-foreground: 0 0% 9%;
+
+    /* Destructive — design-tokens: --danger #c24141 */
+    --destructive: 0 51% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Borders — design-tokens: --border-subtle #e6e4df */
+    --border: 40 12% 88%;
+    --input: 40 12% 88%;
+    --ring: 224 82% 56%;
+
+    /* Radius — design-tokens default 12px */
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 0 0% 7%;
+    --foreground: 40 10% 96%;
+    --card: 0 0% 10%;
+    --card-foreground: 40 10% 96%;
+    --primary: 224 82% 62%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 14%;
+    --secondary-foreground: 40 10% 90%;
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 55%;
+    --accent: 0 0% 14%;
+    --accent-foreground: 40 10% 90%;
+    --destructive: 0 63% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 224 82% 62%;
+    --radius: 0.75rem;
   }
 
   * {
@@ -31,7 +67,8 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', 'Arial', sans-serif;
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
     margin: 0;
+    -webkit-font-smoothing: antialiased;
   }
 }

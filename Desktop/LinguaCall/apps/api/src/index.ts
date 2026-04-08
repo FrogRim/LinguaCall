@@ -10,6 +10,7 @@ import callsRouter from "./routes/calls";
 import workersRouter from "./routes/workers";
 import reportsRouter from "./routes/reports";
 import billingRouter from "./routes/billing";
+import dictionaryRouter from "./routes/dictionary";
 import { attachMediaStreamServer } from "./mediaStream";
 import { mediaRuntime } from "./mediaRuntime";
 import { store } from "./storage/inMemoryStore";
@@ -86,6 +87,7 @@ app.use("/calls", callsRouter);
 app.use("/workers", workersRouter);
 app.use("/reports", reportsRouter);
 app.use("/billing", billingRouter);
+app.use("/dictionary", dictionaryRouter);
 
 app.use((req, res) => {
   res.status(404).json({

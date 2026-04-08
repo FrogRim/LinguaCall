@@ -42,6 +42,10 @@ export const learningSessionsRepository = {
     return store.cancelScheduledSession(clerkUserId, sessionId);
   },
 
+  delete(clerkUserId: string, sessionId: string): Promise<void> {
+    return store.deleteSession(clerkUserId, sessionId);
+  },
+
   generateReport(clerkUserId: string, sessionId: string): Promise<Report> {
     return store.generateSessionReport(clerkUserId, sessionId);
   },
