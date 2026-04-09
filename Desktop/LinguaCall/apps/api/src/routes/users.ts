@@ -90,7 +90,7 @@ router.patch("/me/ui-language", requireAuthenticatedUser, async (req: Authentica
 
 const PhoneStartSchema = z.object({ phone: z.string().min(8) });
 
-router.post("/phone/start", phoneOtpLimiter, requireAuthenticatedUser, async (req: AuthenticatedRequest, res: Response<ApiResponse<{ maskedPhone: string; debugCode: string }>>) => {
+router.post("/phone/start", phoneOtpLimiter, requireAuthenticatedUser, async (req: AuthenticatedRequest, res: Response<ApiResponse<{ maskedPhone: string }>>) => {
   const parsed = PhoneStartSchema.safeParse(req.body);
   if (!parsed.success) {
     const error: ApiError = { code: "validation_error", message: "phone is required (min 8 chars)" };
@@ -102,7 +102,7 @@ router.post("/phone/start", phoneOtpLimiter, requireAuthenticatedUser, async (re
     const result = await usersRepository.startPhoneVerification(req.clerkUserId, phone);
     res.status(200).json({
       ok: true,
-      data: { maskedPhone: result.maskedPhone, debugCode: result.debugCode }
+      data: { maskedPhone: result.maskedPhone }
     });
   } catch (err) {
     res.status(400).json({ ok: false, error: { code: "validation_error", message: "failed_to_send_verification" } });

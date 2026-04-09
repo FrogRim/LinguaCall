@@ -1,6 +1,11 @@
 import type { Pool } from "pg";
 import type { UserProfile } from "@lingua/shared";
 import { AppError, store } from "../../storage/inMemoryStore";
+import {
+  encryptPhoneForStorage,
+  hashPhoneVerificationCode,
+  verifyPhoneVerificationCode
+} from "../../lib/piiSecurity";
 
 type Queryable = Pick<Pool, "query">;
 
@@ -22,7 +27,8 @@ type DbUserRow = {
 
 type DbPhoneVerificationRow = {
   phone: string;
-  code: string;
+  code: string | null;
+  code_hash: string | null;
   attempts: number;
 };
 
@@ -106,7 +112,7 @@ export const createUsersRepository = (db: Queryable) => {
   const startPhoneVerification = async (
     clerkUserId: string,
     phone: string
-  ): Promise<{ maskedPhone: string; debugCode: string }> => {
+  ): Promise<{ maskedPhone: string }> => {
     const existing = await getByClerkUserId(clerkUserId);
     if (!existing) {
       throw new AppError("USER_NOT_FOUND", "user not found");
@@ -122,15 +128,14 @@ export const createUsersRepository = (db: Queryable) => {
     );
     await db.query(
       `
-        INSERT INTO phone_verifications (clerk_user_id, phone, code, attempts, expires_at)
-        VALUES ($1, $2, $3, 0, $4)
+        INSERT INTO phone_verifications (clerk_user_id, phone, code, code_hash, attempts, expires_at)
+        VALUES ($1, $2, NULL, $3, 0, $4)
       `,
-      [clerkUserId, sanitizedPhone, code, expiresAt]
+      [clerkUserId, sanitizedPhone, hashPhoneVerificationCode(code), expiresAt]
     );
 
     return {
-      maskedPhone: normalizePhoneMasked(sanitizedPhone),
-      debugCode: code
+      maskedPhone: normalizePhoneMasked(sanitizedPhone)
     };
   };
 
@@ -147,7 +152,7 @@ export const createUsersRepository = (db: Queryable) => {
     const sanitizedPhone = sanitizeDigits(phone);
     const result = await db.query<DbPhoneVerificationRow>(
       `
-        SELECT phone, code, attempts
+        SELECT phone, code, code_hash, attempts
         FROM phone_verifications
         WHERE clerk_user_id = $1 AND expires_at > NOW()
         LIMIT 1
@@ -166,7 +171,11 @@ export const createUsersRepository = (db: Queryable) => {
       [clerkUserId, newAttempts]
     );
 
-    if (newAttempts > 5 || challenge.code !== code || challenge.phone !== sanitizedPhone) {
+    const codeMatches = challenge.code_hash
+      ? verifyPhoneVerificationCode(challenge.code_hash, code)
+      : challenge.code === code;
+
+    if (newAttempts > 5 || !codeMatches || challenge.phone !== sanitizedPhone) {
       return false;
     }
 
@@ -182,7 +191,7 @@ export const createUsersRepository = (db: Queryable) => {
             updated_at = NOW()
         WHERE clerk_user_id = $1
       `,
-      [clerkUserId, sanitizedPhone, last4, "+82"]
+      [clerkUserId, encryptPhoneForStorage(sanitizedPhone), last4, "+82"]
     );
     await db.query(
       "DELETE FROM phone_verifications WHERE clerk_user_id = $1",

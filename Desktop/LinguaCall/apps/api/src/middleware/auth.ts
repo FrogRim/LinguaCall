@@ -4,6 +4,7 @@ import {
   toSupabaseSubject,
   verifySupabaseAccessToken
 } from "../modules/auth/supabase";
+import { encryptPhoneForStorage } from "../lib/piiSecurity";
 
 export interface AuthenticatedRequest extends Request {
   userId: string;
@@ -56,7 +57,7 @@ const createDefaultRepo = (): AuthMiddlewareRepository => {
                 updated_at = NOW()
             WHERE id = $1
           `,
-          [profile.id, normalizedPhone, phoneLast4, phoneCountryCode]
+          [profile.id, encryptPhoneForStorage(normalizedPhone), phoneLast4, phoneCountryCode]
         );
       }
 

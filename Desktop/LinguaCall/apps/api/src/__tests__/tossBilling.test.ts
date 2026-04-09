@@ -114,4 +114,71 @@ describe("billing toss-only flow", () => {
       failUrl: "https://linguacall.app/#/billing?checkout=cancel&plan=basic"
     });
   });
+
+  it("drops untrusted return and cancel URLs before creating a checkout session", async () => {
+    mocked.createCheckoutSessionMock.mockResolvedValue({
+      provider: "toss",
+      checkoutSessionId: "order_basic_123",
+      planCode: "basic",
+      orderId: "order_basic_123",
+      orderName: "Basic Plan",
+      amount: 9900,
+      successUrl: "https://linguacall.app/#/billing?checkout=success&plan=basic",
+      failUrl: "https://linguacall.app/#/billing?checkout=cancel&plan=basic"
+    });
+
+    const originalAllowedOrigins = process.env.ALLOWED_ORIGINS;
+    process.env.ALLOWED_ORIGINS = "https://linguacall.app";
+
+    const app = express();
+    app.use(express.json());
+    app.use("/billing", billingRouter);
+
+    let response: Awaited<ReturnType<typeof request.agent>["post"]>;
+    try {
+      response = await request(app)
+        .post("/billing/checkout")
+        .send({
+          planCode: "basic",
+          returnUrl: "https://evil.example/steal",
+          cancelUrl: "https://evil.example/cancel"
+        });
+    } finally {
+      process.env.ALLOWED_ORIGINS = originalAllowedOrigins;
+    }
+
+    expect(response.status).toBe(200);
+    expect(mocked.createCheckoutSessionMock).toHaveBeenCalledWith(
+      "local:user-1",
+      expect.objectContaining({
+        planCode: "basic",
+        returnUrl: undefined,
+        cancelUrl: undefined
+      })
+    );
+  });
+
+  it("rejects payment webhooks when the webhook secret is missing", async () => {
+    const originalSecret = process.env.BILLING_WEBHOOK_SECRET_TOSS;
+    const originalFallback = process.env.BILLING_WEBHOOK_SECRET;
+    delete process.env.BILLING_WEBHOOK_SECRET_TOSS;
+    delete process.env.BILLING_WEBHOOK_SECRET;
+
+    const app = express();
+    app.use(express.json());
+    app.use("/billing", billingRouter);
+
+    let response: Awaited<ReturnType<typeof request.agent>["post"]>;
+    try {
+      response = await request(app)
+        .post("/billing/webhooks/toss")
+        .send({ eventType: "payment.confirmed" });
+    } finally {
+      process.env.BILLING_WEBHOOK_SECRET_TOSS = originalSecret;
+      process.env.BILLING_WEBHOOK_SECRET = originalFallback;
+    }
+
+    expect(response.status).toBe(401);
+    expect(mocked.handlePaymentWebhookMock).not.toHaveBeenCalled();
+  });
 });

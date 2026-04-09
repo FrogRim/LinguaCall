@@ -106,7 +106,7 @@ const equalSignature = (expected: string, actual: string): boolean => {
 const verifyTwilioSignature = (req: Request, res: Response<ApiResponse<unknown>>, next: () => void) => {
   const token = process.env.TWILIO_WEBHOOK_AUTH_TOKEN || process.env.TWILIO_AUTH_TOKEN;
   if (!token) {
-    next();
+    res.status(401).json({ ok: false, error: { code: "forbidden", message: "twilio webhook secret not configured" } });
     return;
   }
 
@@ -220,8 +220,8 @@ const handleTwilioTwiml = async (req: Request, res: Response<string>) => {
   }
 };
 
-router.all("/twilio-twiml", handleTwilioTwiml);
-router.all("/twilio-twiml/:callId", handleTwilioTwiml);
+router.all("/twilio-twiml", verifyTwilioSignature, handleTwilioTwiml);
+router.all("/twilio-twiml/:callId", verifyTwilioSignature, handleTwilioTwiml);
 
 const InitiateCallSchema = z.object({
   sessionId: z.string().min(1),

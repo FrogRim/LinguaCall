@@ -15,19 +15,15 @@ const readEnv = (value?: string): string | undefined => {
 };
 
 const getEncryptionSecret = (): string => {
-  return readEnv(process.env.PII_ENCRYPTION_KEY)
-    || readEnv(process.env.PHONE_VERIFICATION_SECRET)
-    || readEnv(process.env.WORKER_SHARED_SECRET)
-    || readEnv(process.env.TOSS_SECRET_KEY)
-    || readEnv(process.env.TWILIO_AUTH_TOKEN)
-    || readEnv(process.env.OPENAI_API_KEY)
-    || readEnv(process.env.DATABASE_URL)
-    || "linguacall-dev-fallback-secret";
+  const key = readEnv(process.env.PII_ENCRYPTION_KEY);
+  if (!key) {
+    throw new Error("PII_ENCRYPTION_KEY is required but not configured");
+  }
+  return key;
 };
 
 const getPhoneVerificationSecret = (): string => {
-  return readEnv(process.env.PHONE_VERIFICATION_SECRET)
-    || getEncryptionSecret();
+  return readEnv(process.env.PHONE_VERIFICATION_SECRET) ?? getEncryptionSecret();
 };
 
 const deriveKey = (secret: string, scope: string): Buffer => {

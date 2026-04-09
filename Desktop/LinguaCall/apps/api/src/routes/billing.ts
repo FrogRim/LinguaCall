@@ -85,7 +85,7 @@ const verifyBillingWebhookSignatureWithProvider = (
 ): boolean => {
   const secret = resolveBillingWebhookSecret(providerHint)?.trim();
   if (!secret) {
-    return process.env.NODE_ENV !== "production";
+    return false;
   }
 
   const signature = extractWebhookSignature(req);
@@ -99,6 +99,29 @@ const verifyBillingWebhookSignatureWithProvider = (
   const expectedHex = createHmac("sha256", secret).update(payloadText).digest("hex");
   const expectedBase64 = createHmac("sha256", secret).update(payloadText).digest("base64");
   return equalSignature(signature, expectedHex) || equalSignature(signature, expectedBase64);
+};
+
+const ALLOWED_REDIRECT_ORIGINS: readonly string[] = Object.freeze(
+  [
+    ...(process.env.ALLOWED_ORIGINS?.split(",") ?? []),
+    process.env.APP_BASE_URL ?? "",
+    process.env.API_BASE_URL ?? ""
+  ]
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0)
+);
+
+const sanitizeRedirectUrl = (raw: unknown): string | undefined => {
+  if (typeof raw !== "string" || !raw.trim()) {
+    return undefined;
+  }
+
+  try {
+    const parsed = new URL(raw);
+    return ALLOWED_REDIRECT_ORIGINS.includes(parsed.origin) ? parsed.toString() : undefined;
+  } catch {
+    return undefined;
+  }
 };
 
 const readWebhookStatus = (body: WebhookBody, eventType: string | undefined): string | undefined => {
@@ -416,8 +439,8 @@ const handleCheckoutSession = async (
     assertTossOnlyProvider(typeof payload.provider === "string" ? payload.provider : undefined);
     const checkout = await billingRepository.createCheckoutSession(req.clerkUserId, {
       planCode: payload.planCode,
-      returnUrl: typeof payload.returnUrl === "string" ? payload.returnUrl : undefined,
-      cancelUrl: typeof payload.cancelUrl === "string" ? payload.cancelUrl : undefined,
+      returnUrl: sanitizeRedirectUrl(payload.returnUrl),
+      cancelUrl: sanitizeRedirectUrl(payload.cancelUrl),
       provider: normalizeTossProvider()
     });
     res.status(200).json({ ok: true, data: checkout });
