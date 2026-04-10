@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { userRoutes } from './api/user';
 import { harnessRoutes } from './api/harness';
+import { alertRoutes } from './api/alert';
 
 export function buildServer() {
   const app = Fastify({ logger: true });
@@ -19,6 +20,7 @@ export function buildServer() {
 
   app.register(userRoutes);
   app.register(harnessRoutes);
+  app.register(alertRoutes);
 
   app.setErrorHandler((error, _req, reply) => {
     const statusCode = error.statusCode ?? 500;
