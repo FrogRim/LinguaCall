@@ -14,6 +14,7 @@ export function checkCondition(condition: Condition, tick: TickData): boolean {
 
   switch (indicator) {
     case 'PRICE_CHANGE':
+      if (tick.prevClose === 0 || Number.isNaN(tick.prevClose)) return false;
       actual = ((tick.price - tick.prevClose) / tick.prevClose) * 100;
       break;
     case 'VOLUME_SURGE':

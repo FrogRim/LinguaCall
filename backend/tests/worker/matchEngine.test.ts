@@ -37,6 +37,16 @@ describe('checkCondition', () => {
     const condition: Condition = { indicator: 'MACD', operator: 'cross_down', value: 0 };
     expect(checkCondition(condition, { price: 95, prevClose: 100, volume: 1000, prevVolume: 1000 })).toBe(false);
   });
+
+  it('PRICE_CHANGE: returns false when prevClose is 0', () => {
+    const condition: Condition = { indicator: 'PRICE_CHANGE', operator: 'gte', value: 1, unit: 'percent' };
+    expect(checkCondition(condition, { price: 100, prevClose: 0, volume: 1000, prevVolume: 1000 })).toBe(false);
+  });
+
+  it('PRICE_CHANGE: returns false when prevClose is NaN', () => {
+    const condition: Condition = { indicator: 'PRICE_CHANGE', operator: 'gte', value: 1, unit: 'percent' };
+    expect(checkCondition(condition, { price: 100, prevClose: NaN, volume: 1000, prevVolume: 1000 })).toBe(false);
+  });
 });
 
 describe('evaluateHarness', () => {

@@ -7,9 +7,26 @@ import type { Condition } from '../llm/schema';
 if (!process.env.KIS_WS_URL) {
   throw new Error('KIS_WS_URL environment variable is not set');
 }
+if (!process.env.KIS_APPROVAL_KEY) {
+  throw new Error('KIS_APPROVAL_KEY environment variable is not set');
+}
 const KIS_WS_URL: string = process.env.KIS_WS_URL;
 let ws: WebSocket | null = null;
 let reconnectDelay = 1000;
+
+function isConditionArray(v: unknown): v is Condition[] {
+  return (
+    Array.isArray(v) &&
+    v.every(
+      (c) =>
+        typeof c === 'object' &&
+        c !== null &&
+        typeof (c as Record<string, unknown>).indicator === 'string' &&
+        typeof (c as Record<string, unknown>).operator === 'string' &&
+        typeof (c as Record<string, unknown>).value === 'number'
+    )
+  );
+}
 
 export function startKISWorker(): void {
   connect();
@@ -69,9 +86,19 @@ async function handleTick(raw: string): Promise<void> {
   const price      = parseFloat(fields[2]);
   const prevClose  = parseFloat(fields[25]);
   const volume     = parseFloat(fields[13]);
-  const prevVolume = parseFloat(fields[14]) || 1;
+  const prevVolume = parseFloat(fields[14]);
 
-  const tick = { price, prevClose, volume, prevVolume };
+  if ([price, prevClose, volume].some(Number.isNaN)) {
+    console.warn('[KIS] Malformed tick, skipping:', fields[0]);
+    return;
+  }
+
+  const tick = {
+    price,
+    prevClose,
+    volume,
+    prevVolume: Number.isNaN(prevVolume) || prevVolume === 0 ? 1 : prevVolume,
+  };
 
   const harnesses = await prisma.harness.findMany({
     where: { ticker, active: true },
@@ -86,11 +113,12 @@ async function handleTick(raw: string): Promise<void> {
       continue;
     }
 
-    const triggered = evaluateHarness(
-      harness.conditions as unknown as Condition[],
-      harness.logic as 'AND' | 'OR',
-      tick
-    );
+    const rawConditions = harness.conditions;
+    if (!isConditionArray(rawConditions)) {
+      console.error('[KIS] Invalid conditions shape for harness', harness.id);
+      continue;
+    }
+    const triggered = evaluateHarness(rawConditions, harness.logic as 'AND' | 'OR', tick);
 
     if (triggered) {
       const deeplink = `supertoss://stock?code=${harness.ticker}&market=${harness.market}`;
