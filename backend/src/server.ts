@@ -1,5 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import { userRoutes } from './api/user';
+import { harnessRoutes } from './api/harness';
 
 export function buildServer() {
   const app = Fastify({ logger: true });
@@ -14,6 +16,9 @@ export function buildServer() {
   app.get('/health', async () => {
     return { status: 'ok' };
   });
+
+  app.register(userRoutes);
+  app.register(harnessRoutes);
 
   return app;
 }
