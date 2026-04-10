@@ -18,14 +18,14 @@ export function Text({ typography, color, style, children }: TextProps) {
     primary: '#3182F6', secondary: '#8B8B8B', danger: '#F04452',
   };
   return (
-    <span style={{
+    <div style={{
       fontSize: typography ? fontSizeMap[typography] : 14,
       color: color ? colorMap[color] : '#191F28',
       display: 'block',
       ...style,
     }}>
       {children}
-    </span>
+    </div>
   );
 }
 
@@ -42,6 +42,7 @@ export function Button({ variant = 'primary', size = 'medium', onClick, disabled
   const paddingMap = { small: '4px 8px', medium: '8px 16px', large: '14px 20px' };
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={disabled}
       style={{

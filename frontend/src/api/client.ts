@@ -1,3 +1,5 @@
+import type { Harness } from '../types/harness';
+
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
 let tossUserKey = '';
@@ -26,7 +28,7 @@ export const api = {
   parseHarness: (input: string) =>
     request('/harnesses/parse', { method: 'POST', body: JSON.stringify({ input }) }),
 
-  getHarnesses: () => request<unknown[]>('/harnesses'),
+  getHarnesses: () => request<Harness[]>('/harnesses'),
 
   createHarness: (data: Record<string, unknown>) =>
     request('/harnesses', { method: 'POST', body: JSON.stringify(data) }),

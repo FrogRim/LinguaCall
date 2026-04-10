@@ -1,19 +1,14 @@
+import type { Harness } from '../types/harness';
 import { Text, Badge, Button } from './tds';
-
-interface Harness {
-  id: string;
-  ticker: string;
-  summary: string;
-  active: boolean;
-}
 
 interface Props {
   harness: Harness;
   onToggle: (id: string, active: boolean) => void;
   onDelete: (id: string) => void;
+  disabled?: boolean;
 }
 
-export function HarnessCard({ harness, onToggle, onDelete }: Props) {
+export function HarnessCard({ harness, onToggle, onDelete, disabled = false }: Props) {
   return (
     <div style={{
       padding: '16px 0',
@@ -34,6 +29,7 @@ export function HarnessCard({ harness, onToggle, onDelete }: Props) {
           size="small"
           variant="secondary"
           onClick={() => onToggle(harness.id, !harness.active)}
+          disabled={disabled}
         >
           {harness.active ? '정지' : '시작'}
         </Button>
@@ -41,6 +37,7 @@ export function HarnessCard({ harness, onToggle, onDelete }: Props) {
           size="small"
           variant="secondary"
           onClick={() => onDelete(harness.id)}
+          disabled={disabled}
         >
           삭제
         </Button>
