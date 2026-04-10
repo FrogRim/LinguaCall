@@ -3,6 +3,7 @@ import { prisma } from '../db/client';
 import { evaluateHarness } from './matchEngine';
 import { sendPush } from '../pusher/pushClient';
 import type { Condition } from '../llm/schema';
+import { updatePriceCache } from '../scheduler/batchRunner';
 
 if (!process.env.KIS_WS_URL) {
   throw new Error('KIS_WS_URL environment variable is not set');
@@ -99,6 +100,9 @@ async function handleTick(raw: string): Promise<void> {
     volume,
     prevVolume: Number.isNaN(prevVolume) || prevVolume === 0 ? 1 : prevVolume,
   };
+
+  // Feed the current price into the batch price cache
+  updatePriceCache(ticker, price);
 
   const harnesses = await prisma.harness.findMany({
     where: { ticker, active: true },
