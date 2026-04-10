@@ -22,7 +22,16 @@ export async function alertRoutes(app: FastifyInstance) {
 
   // 딥링크 클릭 추적
   app.post<{ Params: { id: string } }>('/alerts/:id/click', async (req, reply) => {
-    const alertRecord = await prisma.alert.findUnique({ where: { id: req.params.id } });
+    const rawKey = req.headers['x-toss-user-key'];
+    const tossUserKey = Array.isArray(rawKey) ? rawKey[0] : rawKey;
+    if (!tossUserKey) return reply.status(401).send({ error: 'Unauthorized' });
+
+    const user = await prisma.user.findUnique({ where: { tossUserKey } });
+    if (!user) return reply.status(401).send({ error: 'Unauthorized' });
+
+    const alertRecord = await prisma.alert.findFirst({
+      where: { id: req.params.id, userId: user.id },
+    });
     if (!alertRecord) return reply.status(404).send({ error: 'Not found' });
 
     await prisma.alert.update({
