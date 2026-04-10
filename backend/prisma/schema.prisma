@@ -1,11 +1,55 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
+// backend/prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String    @id @default(cuid())
+  tossUserKey String    @unique
+  plan        Plan      @default(FREE)
+  harnesses   Harness[]
+  alerts      Alert[]
+  createdAt   DateTime  @default(now())
+}
+
+enum Plan {
+  FREE
+  PAID
+}
+
+model Harness {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  ticker      String
+  market      String
+  conditions  Json
+  logic       String
+  sensitivity String    // "LOW" | "MEDIUM" | "HIGH"
+  summary     String
+  active      Boolean   @default(true)
+  lastAlertAt DateTime?
+  alerts      Alert[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([ticker, active])
+}
+
+model Alert {
+  id          String   @id @default(cuid())
+  harnessId   String
+  harness     Harness  @relation(fields: [harnessId], references: [id])
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  triggeredBy String
+  priceAt     Float
+  deeplink    String
+  clicked     Boolean  @default(false)
+  sentAt      DateTime @default(now())
 }

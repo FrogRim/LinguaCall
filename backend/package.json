@@ -17,12 +17,13 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "fastify": "^4.28.1",
     "@fastify/cors": "^11.2.0",
+    "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^7.7.0",
+    "axios": "^1.15.0",
+    "fastify": "^4.28.1",
     "node-cron": "^3.0.3",
-    "ws": "^8.18.1",
-    "axios": "^1.15.0"
+    "ws": "^8.18.1"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
