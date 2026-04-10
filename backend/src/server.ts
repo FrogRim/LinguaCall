@@ -20,6 +20,15 @@ export function buildServer() {
   app.register(userRoutes);
   app.register(harnessRoutes);
 
+  app.setErrorHandler((error, _req, reply) => {
+    const statusCode = error.statusCode ?? 500;
+    if (statusCode >= 500) {
+      app.log.error(error);
+      return reply.status(500).send({ error: 'Internal server error' });
+    }
+    return reply.status(statusCode).send({ error: error.message });
+  });
+
   return app;
 }
 

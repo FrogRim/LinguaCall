@@ -11,7 +11,9 @@ async function getUserByKey(tossUserKey: string) {
 export async function harnessRoutes(app: FastifyInstance) {
   // 하니스 목록 조회
   app.get('/harnesses', async (req, reply) => {
-    const tossUserKey = req.headers['x-toss-user-key'] as string;
+    const rawKey = req.headers['x-toss-user-key'];
+    const tossUserKey = Array.isArray(rawKey) ? rawKey[0] : rawKey;
+    if (!tossUserKey) return reply.status(401).send({ error: 'Unauthorized' });
     const user = await getUserByKey(tossUserKey);
     if (!user) return reply.status(401).send({ error: 'Unauthorized' });
 
@@ -32,39 +34,64 @@ export async function harnessRoutes(app: FastifyInstance) {
       summary: string;
     };
   }>('/harnesses', async (req, reply) => {
-    const tossUserKey = req.headers['x-toss-user-key'] as string;
+    const rawKey = req.headers['x-toss-user-key'];
+    const tossUserKey = Array.isArray(rawKey) ? rawKey[0] : rawKey;
+    if (!tossUserKey) return reply.status(401).send({ error: 'Unauthorized' });
     const user = await getUserByKey(tossUserKey);
     if (!user) return reply.status(401).send({ error: 'Unauthorized' });
 
-    if (user.plan === 'FREE') {
-      const count = await prisma.harness.count({ where: { userId: user.id } });
-      if (count >= FREE_PLAN_LIMIT) {
-        return reply.status(403).send({ error: 'FREE plan limit reached', limit: FREE_PLAN_LIMIT });
-      }
+    const validSensitivities = Object.values(Sensitivity) as string[];
+    if (!validSensitivities.includes(req.body.sensitivity)) {
+      return reply.status(400).send({ error: `Invalid sensitivity. Must be one of: ${validSensitivities.join(', ')}` });
     }
 
-    const harness = await prisma.harness.create({
-      data: {
-        userId: user.id,
-        ticker: req.body.ticker,
-        market: req.body.market,
-        conditions: req.body.conditions as object[],
-        logic: req.body.logic,
-        sensitivity: req.body.sensitivity as Sensitivity,
-        summary: req.body.summary,
-      },
-    });
+    if (!Array.isArray(req.body.conditions) || req.body.conditions.length === 0) {
+      return reply.status(400).send({ error: 'conditions must be a non-empty array' });
+    }
 
-    return reply.status(201).send(harness);
+    try {
+      const harness = await prisma.$transaction(async (tx) => {
+        if (user.plan === 'FREE') {
+          const count = await tx.harness.count({ where: { userId: user.id } });
+          if (count >= FREE_PLAN_LIMIT) {
+            throw Object.assign(new Error('FREE plan limit reached'), { statusCode: 403 });
+          }
+        }
+        return tx.harness.create({
+          data: {
+            userId: user.id,
+            ticker: req.body.ticker,
+            market: req.body.market,
+            conditions: req.body.conditions as object[],
+            logic: req.body.logic,
+            sensitivity: req.body.sensitivity as Sensitivity,
+            summary: req.body.summary,
+          },
+        });
+      });
+      return reply.status(201).send(harness);
+    } catch (err: unknown) {
+      const e = err as { statusCode?: number; message?: string };
+      if (e.statusCode === 403) {
+        return reply.status(403).send({ error: e.message, limit: FREE_PLAN_LIMIT });
+      }
+      throw err; // Let global error handler catch it
+    }
   });
 
   // 하니스 활성화 토글
   app.patch<{ Params: { id: string }; Body: { active: boolean } }>(
     '/harnesses/:id',
     async (req, reply) => {
-      const tossUserKey = req.headers['x-toss-user-key'] as string;
+      const rawKey = req.headers['x-toss-user-key'];
+      const tossUserKey = Array.isArray(rawKey) ? rawKey[0] : rawKey;
+      if (!tossUserKey) return reply.status(401).send({ error: 'Unauthorized' });
       const user = await getUserByKey(tossUserKey);
       if (!user) return reply.status(401).send({ error: 'Unauthorized' });
+
+      if (typeof req.body.active !== 'boolean') {
+        return reply.status(400).send({ error: 'active must be a boolean' });
+      }
 
       const harness = await prisma.harness.findFirst({
         where: { id: req.params.id, userId: user.id },
@@ -80,7 +107,9 @@ export async function harnessRoutes(app: FastifyInstance) {
 
   // 하니스 삭제
   app.delete<{ Params: { id: string } }>('/harnesses/:id', async (req, reply) => {
-    const tossUserKey = req.headers['x-toss-user-key'] as string;
+    const rawKey = req.headers['x-toss-user-key'];
+    const tossUserKey = Array.isArray(rawKey) ? rawKey[0] : rawKey;
+    if (!tossUserKey) return reply.status(401).send({ error: 'Unauthorized' });
     const user = await getUserByKey(tossUserKey);
     if (!user) return reply.status(401).send({ error: 'Unauthorized' });
 
