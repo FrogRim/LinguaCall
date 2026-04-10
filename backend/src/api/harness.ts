@@ -35,18 +35,28 @@ export async function harnessRoutes(app: FastifyInstance) {
     if (!req.body.input || typeof req.body.input !== 'string') {
       return reply.status(400).send({ error: 'input is required' });
     }
+    // (length check is now inside parseHarness itself)
 
-    const result = await parseHarness(req.body.input);
+    try {
+      const result = await parseHarness(req.body.input);
 
-    if (result.confidence < 0.6) {
-      return reply.status(422).send({
-        error: 'low_confidence',
-        message: '좀 더 구체적으로 말씀해 주실 수 있나요? 예: "10% 떨어지면" 또는 "과매도 구간에 오면"',
-        confidence: result.confidence,
-      });
+      if (result.confidence < 0.6) {
+        return reply.status(422).send({
+          error: 'low_confidence',
+          message: '좀 더 구체적으로 말씀해 주실 수 있나요? 예: "10% 떨어지면" 또는 "과매도 구간에 오면"',
+          confidence: result.confidence,
+        });
+      }
+
+      return result;
+    } catch (err: unknown) {
+      const e = err as { statusCode?: number; message?: string };
+      if (e.statusCode === 400) {
+        return reply.status(400).send({ error: e.message });
+      }
+      app.log.error(err);
+      return reply.status(503).send({ error: 'llm_unavailable', message: 'AI 서비스에 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' });
     }
-
-    return result;
   });
 
   // 하니스 생성
