@@ -28,7 +28,7 @@ export const api = {
 
   getHarnesses: () => request<unknown[]>('/harnesses'),
 
-  createHarness: (data: object) =>
+  createHarness: (data: Record<string, unknown>) =>
     request('/harnesses', { method: 'POST', body: JSON.stringify(data) }),
 
   toggleHarness: (id: string, active: boolean) =>
