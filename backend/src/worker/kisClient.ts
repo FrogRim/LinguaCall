@@ -4,7 +4,10 @@ import { evaluateHarness } from './matchEngine';
 import { sendPush } from '../pusher/pushClient';
 import type { Condition } from '../llm/schema';
 
-const KIS_WS_URL = process.env.KIS_WS_URL ?? 'ws://ops.koreainvestment.com:21000';
+if (!process.env.KIS_WS_URL) {
+  throw new Error('KIS_WS_URL environment variable is not set');
+}
+const KIS_WS_URL: string = process.env.KIS_WS_URL;
 let ws: WebSocket | null = null;
 let reconnectDelay = 1000;
 

@@ -27,6 +27,16 @@ describe('checkCondition', () => {
     const condition: Condition = { indicator: 'RSI', operator: 'lte', value: 30 };
     expect(checkCondition(condition, { price: 95, prevClose: 100, volume: 1000, prevVolume: 1000 })).toBe(false);
   });
+
+  it('MA_DEVIATION indicator returns false (batch-only)', () => {
+    const condition: Condition = { indicator: 'MA_DEVIATION', operator: 'lte', value: -5, unit: 'percent' };
+    expect(checkCondition(condition, { price: 95, prevClose: 100, volume: 1000, prevVolume: 1000 })).toBe(false);
+  });
+
+  it('MACD indicator returns false (batch-only)', () => {
+    const condition: Condition = { indicator: 'MACD', operator: 'cross_down', value: 0 };
+    expect(checkCondition(condition, { price: 95, prevClose: 100, volume: 1000, prevVolume: 1000 })).toBe(false);
+  });
 });
 
 describe('evaluateHarness', () => {
