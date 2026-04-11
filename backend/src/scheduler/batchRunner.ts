@@ -15,7 +15,7 @@ export function startBatchScheduler() {
   console.log('[Scheduler] Batch scheduler started');
 }
 
-function isValidCondition(c: unknown): c is Condition {
+export function isValidCondition(c: unknown): c is Condition {
   if (typeof c !== 'object' || c === null) return false;
   const obj = c as Record<string, unknown>;
   return (
@@ -90,7 +90,7 @@ async function runBatch() {
   }
 }
 
-function checkBatchCondition(condition: Condition, prices: number[], currentPrice: number): boolean {
+export function checkBatchCondition(condition: Condition, prices: number[], currentPrice: number): boolean {
   const { indicator, operator, value } = condition;
   let actual = 0;
 
