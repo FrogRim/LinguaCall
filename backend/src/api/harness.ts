@@ -1,22 +1,30 @@
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../db/client';
 import { Sensitivity } from '@prisma/client';
 import { parseHarness } from '../llm/parser';
 
 const FREE_PLAN_LIMIT = 3;
 
-async function getUserByKey(tossUserKey: string) {
-  return prisma.user.findUnique({ where: { tossUserKey } });
+async function requireAuth(req: FastifyRequest, reply: FastifyReply) {
+  const rawKey = req.headers['x-toss-user-key'];
+  const tossUserKey = Array.isArray(rawKey) ? rawKey[0] : rawKey;
+  if (!tossUserKey) {
+    await reply.status(401).send({ error: 'Unauthorized' });
+    return null;
+  }
+  const user = await prisma.user.findUnique({ where: { tossUserKey } });
+  if (!user) {
+    await reply.status(401).send({ error: 'Unauthorized' });
+    return null;
+  }
+  return user;
 }
 
 export async function harnessRoutes(app: FastifyInstance) {
   // 하니스 목록 조회
   app.get('/harnesses', async (req, reply) => {
-    const rawKey = req.headers['x-toss-user-key'];
-    const tossUserKey = Array.isArray(rawKey) ? rawKey[0] : rawKey;
-    if (!tossUserKey) return reply.status(401).send({ error: 'Unauthorized' });
-    const user = await getUserByKey(tossUserKey);
-    if (!user) return reply.status(401).send({ error: 'Unauthorized' });
+    const user = await requireAuth(req, reply);
+    if (!user) return;
 
     return prisma.harness.findMany({
       where: { userId: user.id },
@@ -26,11 +34,8 @@ export async function harnessRoutes(app: FastifyInstance) {
 
   // LLM 파싱 엔드포인트
   app.post<{ Body: { input: string } }>('/harnesses/parse', async (req, reply) => {
-    const rawKey = req.headers['x-toss-user-key'];
-    const tossUserKey = Array.isArray(rawKey) ? rawKey[0] : rawKey;
-    if (!tossUserKey) return reply.status(401).send({ error: 'Unauthorized' });
-    const user = await getUserByKey(tossUserKey);
-    if (!user) return reply.status(401).send({ error: 'Unauthorized' });
+    const user = await requireAuth(req, reply);
+    if (!user) return;
 
     if (!req.body.input || typeof req.body.input !== 'string') {
       return reply.status(400).send({ error: 'input is required' });
@@ -70,11 +75,8 @@ export async function harnessRoutes(app: FastifyInstance) {
       summary: string;
     };
   }>('/harnesses', async (req, reply) => {
-    const rawKey = req.headers['x-toss-user-key'];
-    const tossUserKey = Array.isArray(rawKey) ? rawKey[0] : rawKey;
-    if (!tossUserKey) return reply.status(401).send({ error: 'Unauthorized' });
-    const user = await getUserByKey(tossUserKey);
-    if (!user) return reply.status(401).send({ error: 'Unauthorized' });
+    const user = await requireAuth(req, reply);
+    if (!user) return;
 
     const validSensitivities = Object.values(Sensitivity) as string[];
     if (!validSensitivities.includes(req.body.sensitivity)) {
@@ -119,11 +121,8 @@ export async function harnessRoutes(app: FastifyInstance) {
   app.patch<{ Params: { id: string }; Body: { active: boolean } }>(
     '/harnesses/:id',
     async (req, reply) => {
-      const rawKey = req.headers['x-toss-user-key'];
-      const tossUserKey = Array.isArray(rawKey) ? rawKey[0] : rawKey;
-      if (!tossUserKey) return reply.status(401).send({ error: 'Unauthorized' });
-      const user = await getUserByKey(tossUserKey);
-      if (!user) return reply.status(401).send({ error: 'Unauthorized' });
+      const user = await requireAuth(req, reply);
+      if (!user) return;
 
       if (typeof req.body.active !== 'boolean') {
         return reply.status(400).send({ error: 'active must be a boolean' });
@@ -143,11 +142,8 @@ export async function harnessRoutes(app: FastifyInstance) {
 
   // 하니스 삭제
   app.delete<{ Params: { id: string } }>('/harnesses/:id', async (req, reply) => {
-    const rawKey = req.headers['x-toss-user-key'];
-    const tossUserKey = Array.isArray(rawKey) ? rawKey[0] : rawKey;
-    if (!tossUserKey) return reply.status(401).send({ error: 'Unauthorized' });
-    const user = await getUserByKey(tossUserKey);
-    if (!user) return reply.status(401).send({ error: 'Unauthorized' });
+    const user = await requireAuth(req, reply);
+    if (!user) return;
 
     const harness = await prisma.harness.findFirst({
       where: { id: req.params.id, userId: user.id },

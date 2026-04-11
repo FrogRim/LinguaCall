@@ -8,6 +8,12 @@ import { SummaryCard } from '../components/SummaryCard';
 
 type Sensitivity = 'LOW' | 'MEDIUM' | 'HIGH';
 
+const SENSITIVITY_LABELS: Record<Sensitivity, string> = {
+  LOW: '둔감하게 (큰 신호만)',
+  MEDIUM: '적당하게',
+  HIGH: '기민하게 (작은 신호에도)',
+};
+
 interface Condition {
   indicator: string;
   operator: string;
@@ -148,7 +154,7 @@ export function Builder() {
               style={{ width: '100%', marginTop: 8 }}
               onClick={() => setSensitivity(s)}
             >
-              {s === 'LOW' ? '둔감하게 (큰 신호만)' : s === 'MEDIUM' ? '적당하게' : '기민하게 (작은 신호에도)'}
+              {SENSITIVITY_LABELS[s]}
             </Button>
           ))}
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
