@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Text, Button } from '../components/tds';
+import { Text, Button } from '../components/tdsCompat';
 import { api } from '../api/client';
 import { HarnessCard } from '../components/HarnessCard';
 

@@ -1,4 +1,4 @@
-import { Text } from './tds';
+import { Text } from './tdsCompat';
 
 interface Props {
   label: string;

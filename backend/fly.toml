@@ -1,0 +1,30 @@
+# fly.toml - AI 투자 하니스 백엔드
+# 앱 이름은 fly launch 시 자동 생성되거나 직접 지정
+app = "ai-investment-harness"
+primary_region = "nrt"  # Tokyo — KIS Open API 서버와 가장 가까운 리전
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3000"
+  HOST = "0.0.0.0"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = false   # KIS WebSocket + node-cron 상시 기동 필수
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/health"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"   # 256MB — MVP 충분, WebSocket 트래픽 증가 시 shared-cpu-2x로 업
+  memory = "256mb"

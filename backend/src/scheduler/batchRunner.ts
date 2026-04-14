@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import { prisma } from '../db/client';
+import { getLogger } from '../logger';
 import { calculateRSI } from './indicators/rsi';
 import { calculateMADeviation } from './indicators/maDeviation';
 import { calculateMACD } from './indicators/macd';
@@ -8,11 +9,12 @@ import type { Condition } from '../llm/schema';
 
 // Per-ticker historical price cache (in prod, replace with Redis)
 const priceCache = new Map<string, number[]>();
+const logger = getLogger({ module: 'scheduler.batchRunner' });
 
 export function startBatchScheduler() {
   // Weekdays 09:00–15:30 KST = UTC 00:00–06:30, run every 5 min
   cron.schedule('*/5 0-6 * * 1-5', runBatch, { timezone: 'Asia/Seoul' });
-  console.log('[Scheduler] Batch scheduler started');
+  logger.info('Batch scheduler started');
 }
 
 export function isValidCondition(c: unknown): c is Condition {
@@ -69,7 +71,7 @@ async function runBatch() {
         try {
           return checkBatchCondition(c, prices, currentPrice);
         } catch (err) {
-          console.error(`[Scheduler] indicator error for harness ${harness.id} (${c.indicator}):`, err);
+          logger.error({ err, harnessId: harness.id, ticker: harness.ticker, indicator: c.indicator }, 'Batch indicator evaluation failed');
           return false;
         }
       });
@@ -86,7 +88,7 @@ async function runBatch() {
       }
     }
   } catch (err) {
-    console.error('[Scheduler] runBatch failed:', err);
+    logger.error({ err }, 'Batch run failed');
   }
 }
 
