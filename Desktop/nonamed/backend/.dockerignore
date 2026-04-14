@@ -4,4 +4,3 @@ dist
 .env.*
 tests
 *.test.ts
-tsconfig.json
