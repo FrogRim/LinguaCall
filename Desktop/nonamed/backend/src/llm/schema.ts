@@ -3,7 +3,9 @@ export type IndicatorType =
   | 'VOLUME_SURGE'
   | 'MA_DEVIATION'
   | 'RSI'
-  | 'MACD';
+  | 'MACD'
+  | 'PER'
+  | 'OPERATING_PROFIT_GROWTH';
 
 export type Operator = 'gte' | 'lte' | 'gt' | 'lt' | 'cross_up' | 'cross_down';
 
@@ -13,6 +15,16 @@ export interface Condition {
   value: number;
   unit?: 'percent' | 'absolute';
   period?: number; // MA, RSI 기간
+}
+
+export interface MatchEvaluationDetail {
+  indicator: IndicatorType;
+  operator: Operator;
+  target: number;
+  actual: number;
+  triggered: boolean;
+  unit?: 'percent' | 'absolute';
+  period?: number;
 }
 
 export interface ParsedHarness {

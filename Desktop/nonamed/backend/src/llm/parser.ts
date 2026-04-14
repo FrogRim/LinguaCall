@@ -91,6 +91,49 @@ export async function callLLM(input: string): Promise<ParsedHarness> {
   return validateParsedHarness(parsed);
 }
 
+export async function callLLMText(messages: { role: string; content: string }[]): Promise<string> {
+  const apiKey = process.env.LLM_API_KEY;
+  const apiUrl = process.env.LLM_API_URL;
+
+  if (!apiKey || !apiUrl) {
+    throw new Error('LLM_API_KEY and LLM_API_URL must be set');
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: process.env.LLM_MODEL ?? 'gpt-4o',
+        messages,
+      }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!response.ok) {
+    throw new Error(`LLM API error: ${response.status} ${response.statusText}`);
+  }
+
+  const data = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error('LLM returned empty or malformed response');
+
+  return content;
+}
+
 export async function parseHarness(input: string): Promise<ParsedHarness> {
   if (input.length > MAX_INPUT_LENGTH) {
     throw Object.assign(new Error('Input too long'), { statusCode: 400 });
