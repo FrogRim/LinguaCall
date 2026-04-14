@@ -1,10 +1,12 @@
 // backend/src/pusher/pushClient.ts
 import { prisma } from '../db/client';
+import { getLogger } from '../logger';
 import { readFileSync } from 'fs';
 import https from 'https';
 import fetch from 'node-fetch';
 
 const PUSH_API_URL = 'https://apps-in-toss-api.toss.im/api-partner/v1/apps-in-toss/messenger/send-message';
+const logger = getLogger({ module: 'pusher.pushClient' });
 
 // mTLS 인증서 설정
 function createAgent(): https.Agent {
@@ -65,8 +67,7 @@ export async function sendPush({ userKey, harness, price, deeplink }: SendPushPa
       return;
     } catch (err) {
       if (attempt === MAX_RETRIES) {
-        console.error(`[Pusher] Failed after ${MAX_RETRIES} attempts:`, err);
-        // 실패 이력 로깅 (DB 연결 실패 시 console.error로 폴백)
+        logger.error({ err, attempt, maxRetries: MAX_RETRIES, harnessId: harness.id, userId: harness.userId }, 'Push delivery failed after retries');
         try {
           await prisma.alert.create({
             data: {
@@ -78,7 +79,7 @@ export async function sendPush({ userKey, harness, price, deeplink }: SendPushPa
             },
           });
         } catch (dbErr) {
-          console.error('[Pusher] Failed to record failed push to DB:', dbErr);
+          logger.error({ err: dbErr, harnessId: harness.id, userId: harness.userId }, 'Failed to record failed push to DB');
         }
       } else {
         // 지수 백오프: 1s, 2s, 4s

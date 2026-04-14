@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from '@jest/globals';
 import { buildServer } from '../../src/server';
 import { prisma } from '../../src/db/client';
+import { issueSessionToken } from '../../src/api/auth';
 import type { FastifyInstance } from 'fastify';
 
 const TEST_USER_KEY = 'harness-test-user';
@@ -13,6 +14,10 @@ const mockHarness = {
   sensitivity: 'MEDIUM',
   summary: '삼성전자가 5% 하락하면 알려드려요',
 };
+
+function authHeaders(userId: string) {
+  return { authorization: `Bearer ${issueSessionToken(userId)}` };
+}
 
 describe('Harness API', () => {
   let app: FastifyInstance;
@@ -39,7 +44,7 @@ describe('Harness API', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/harnesses',
-      headers: { 'x-toss-user-key': TEST_USER_KEY },
+      headers: authHeaders(userId),
       payload: mockHarness,
     });
     expect(res.statusCode).toBe(201);
@@ -48,19 +53,52 @@ describe('Harness API', () => {
     expect(body.active).toBe(true);
   });
 
+  it('rejects raw x-toss-user-key headers on protected routes', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/harnesses',
+      headers: { 'x-toss-user-key': TEST_USER_KEY },
+    });
+
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('rejects malformed bearer tokens on protected routes', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/harnesses',
+      headers: { authorization: 'Bearer not-a-valid-token' },
+    });
+
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('rejects forged bearer tokens on protected routes', async () => {
+    const validToken = issueSessionToken(userId);
+    const forgedToken = `${validToken.slice(0, -1)}${validToken.endsWith('a') ? 'b' : 'a'}`;
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/harnesses',
+      headers: { authorization: `Bearer ${forgedToken}` },
+    });
+
+    expect(res.statusCode).toBe(401);
+  });
+
   it('rejects when FREE plan exceeds 3 harnesses', async () => {
     for (let i = 0; i < 3; i++) {
       await app.inject({
         method: 'POST',
         url: '/harnesses',
-        headers: { 'x-toss-user-key': TEST_USER_KEY },
+        headers: authHeaders(userId),
         payload: { ...mockHarness, ticker: `00000${i}` },
       });
     }
     const res = await app.inject({
       method: 'POST',
       url: '/harnesses',
-      headers: { 'x-toss-user-key': TEST_USER_KEY },
+      headers: authHeaders(userId),
       payload: mockHarness,
     });
     expect(res.statusCode).toBe(403);
@@ -70,13 +108,13 @@ describe('Harness API', () => {
     await app.inject({
       method: 'POST',
       url: '/harnesses',
-      headers: { 'x-toss-user-key': TEST_USER_KEY },
+      headers: authHeaders(userId),
       payload: mockHarness,
     });
     const res = await app.inject({
       method: 'GET',
       url: '/harnesses',
-      headers: { 'x-toss-user-key': TEST_USER_KEY },
+      headers: authHeaders(userId),
     });
     expect(res.statusCode).toBe(200);
     const body = res.json<unknown[]>();
@@ -87,7 +125,7 @@ describe('Harness API', () => {
     const created = await app.inject({
       method: 'POST',
       url: '/harnesses',
-      headers: { 'x-toss-user-key': TEST_USER_KEY },
+      headers: authHeaders(userId),
       payload: mockHarness,
     });
     const { id } = created.json<{ id: string }>();
@@ -95,7 +133,7 @@ describe('Harness API', () => {
     const res = await app.inject({
       method: 'DELETE',
       url: `/harnesses/${id}`,
-      headers: { 'x-toss-user-key': TEST_USER_KEY },
+      headers: authHeaders(userId),
     });
     expect(res.statusCode).toBe(200);
   });

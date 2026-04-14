@@ -1,5 +1,5 @@
 import type { Harness } from '../types/harness';
-import { Text, Badge, Button } from './tds';
+import { Text, Badge, Button } from './tdsCompat';
 
 interface Props {
   harness: Harness;

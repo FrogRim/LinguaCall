@@ -1,3 +1,10 @@
 dist/
 node_modules/
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx

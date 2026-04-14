@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Text, ListRow } from '../components/tds';
+import { Text, ListRow } from '../components/tdsCompat';
 import { api } from '../api/client';
 
 interface AlertItem {

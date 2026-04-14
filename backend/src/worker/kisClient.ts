@@ -1,5 +1,6 @@
 import WebSocket from 'ws';
 import { prisma } from '../db/client';
+import { getLogger } from '../logger';
 import { evaluateHarness } from './matchEngine';
 import { sendPush } from '../pusher/pushClient';
 import type { Condition } from '../llm/schema';
@@ -12,6 +13,7 @@ if (!process.env.KIS_APPROVAL_KEY) {
   throw new Error('KIS_APPROVAL_KEY environment variable is not set');
 }
 const KIS_WS_URL: string = process.env.KIS_WS_URL;
+const logger = getLogger({ module: 'worker.kisClient' });
 let ws: WebSocket | null = null;
 let reconnectDelay = 1000;
 
@@ -39,7 +41,7 @@ function connect(): void {
   ws.on('open', () => {
     reconnectDelay = 1000;
     subscribeActiveHarnesses().catch((err: unknown) => {
-      console.error('[KIS] Failed to subscribe:', err);
+      logger.error({ err }, 'Failed to subscribe active harnesses');
     });
   });
 
@@ -47,7 +49,7 @@ function connect(): void {
     const message = data.toString();
     if (message.startsWith('0|H0STCNT0')) {
       handleTick(message).catch((err: unknown) => {
-        console.error('[KIS] Tick handling error:', err);
+        logger.error({ err }, 'KIS tick handling failed');
       });
     }
   });
@@ -59,7 +61,7 @@ function connect(): void {
   });
 
   ws.on('error', (err: Error) => {
-    console.error('[KIS] WebSocket error:', err.message);
+    logger.error({ err }, 'KIS WebSocket error');
   });
 }
 
@@ -90,7 +92,7 @@ async function handleTick(raw: string): Promise<void> {
   const prevVolume = parseFloat(fields[14]);
 
   if ([price, prevClose, volume].some(Number.isNaN)) {
-    console.warn('[KIS] Malformed tick, skipping:', fields[0]);
+    logger.warn({ ticker }, 'Malformed KIS tick skipped');
     return;
   }
 
@@ -119,7 +121,7 @@ async function handleTick(raw: string): Promise<void> {
 
     const rawConditions = harness.conditions;
     if (!isConditionArray(rawConditions)) {
-      console.error('[KIS] Invalid conditions shape for harness', harness.id);
+      logger.error({ harnessId: harness.id, ticker }, 'Invalid harness conditions shape');
       continue;
     }
     const triggered = evaluateHarness(rawConditions, harness.logic as 'AND' | 'OR', tick);
