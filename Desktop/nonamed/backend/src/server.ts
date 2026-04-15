@@ -26,6 +26,7 @@ export function buildServer() {
     reply.header('x-content-type-options', 'nosniff');
     reply.header('x-frame-options', 'DENY');
     reply.header('referrer-policy', 'no-referrer');
+    reply.header('content-security-policy', "default-src 'none'");
 
     if (isProduction) {
       reply.header('strict-transport-security', 'max-age=31536000; includeSubDomains');

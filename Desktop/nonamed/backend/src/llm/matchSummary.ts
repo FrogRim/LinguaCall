@@ -98,6 +98,8 @@ export function formatMatchSummaryFallback({ ticker, market, price, harnessSumma
 }
 
 function buildPrompt(input: MatchSummaryInput): string {
+  const sanitizedSummary = input.harnessSummary.replace(/[\r\n]+/g, ' ').slice(0, 200);
+
   const detailLines = input.details.map((detail, index) => {
     return `${index + 1}. 지표=${detail.indicator}, 연산자=${detail.operator}, 목표=${detail.target}, 실제=${detail.actual}, 충족=${detail.triggered}, 단위=${detail.unit ?? 'absolute'}, 기간=${detail.period ?? '없음'}`;
   }).join('\n');
@@ -106,7 +108,7 @@ function buildPrompt(input: MatchSummaryInput): string {
     `종목: ${input.ticker}`,
     `시장: ${input.market}`,
     `현재가: ${input.price}`,
-    `기존 하니스 요약: ${input.harnessSummary}`,
+    `기존 하니스 요약: ${sanitizedSummary}`,
     '충족 여부 상세:',
     detailLines,
   ].join('\n');
