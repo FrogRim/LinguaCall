@@ -481,8 +481,41 @@ router.post(
       return;
     }
 
+    const pendingCheckout = await billingRepository.getPendingCheckoutByOrderId(orderId);
+    if (!pendingCheckout) {
+      res.status(422).json({
+        ok: false,
+        error: { code: "not_found", message: "checkout session not found" }
+      });
+      return;
+    }
+    if (pendingCheckout.clerkUserId !== req.clerkUserId) {
+      res.status(422).json({
+        ok: false,
+        error: { code: "conflict", message: "checkout session belongs to another user" }
+      });
+      return;
+    }
+    if (pendingCheckout.amount !== amount) {
+      res.status(422).json({
+        ok: false,
+        error: { code: "validation_error", message: "checkout amount does not match" }
+      });
+      return;
+    }
+
+    const claimedCheckout = await billingRepository.claimPendingCheckout(orderId);
+    if (!claimedCheckout) {
+      res.status(409).json({
+        ok: false,
+        error: { code: "conflict", message: "checkout confirmation already in progress" }
+      });
+      return;
+    }
+
     const tossSecretKey = process.env.TOSS_SECRET_KEY;
     if (!tossSecretKey) {
+      await billingRepository.releasePendingCheckout(orderId, claimedCheckout.confirmationToken);
       res.status(500).json({
         ok: false,
         error: { code: "validation_error", message: "toss payments not configured" }
@@ -502,6 +535,7 @@ router.post(
         body: JSON.stringify({ paymentKey, orderId, amount })
       });
     } catch {
+      await billingRepository.releasePendingCheckout(orderId, claimedCheckout.confirmationToken);
       res.status(502).json({
         ok: false,
         error: { code: "validation_error", message: "failed to reach toss payments api" }
@@ -510,6 +544,7 @@ router.post(
     }
 
     if (!tossHttpResponse.ok) {
+      await billingRepository.releasePendingCheckout(orderId, claimedCheckout.confirmationToken);
       const tossError = (await tossHttpResponse.json().catch(() => ({}))) as Record<string, unknown>;
       res.status(402).json({
         ok: false,
@@ -523,10 +558,6 @@ router.post(
 
     const tossData = (await tossHttpResponse.json()) as Record<string, unknown>;
     const metadata = tossData.metadata as Record<string, unknown> | undefined;
-    const planCode =
-      (metadata?.planCode as string | undefined) ??
-      (tossData.orderName as string | undefined) ??
-      "basic";
 
     try {
       const subscription = await billingRepository.handleWebhook({
@@ -534,12 +565,14 @@ router.post(
         provider: TOSS_PROVIDER,
         providerSubscriptionId: orderId,
         clerkUserId: req.clerkUserId,
-        planCode,
+        planCode: claimedCheckout.planCode,
         status: "active",
         metadata: { paymentKey, orderId, amount, ...metadata }
       });
+      await billingRepository.completePendingCheckout(orderId, claimedCheckout.confirmationToken);
       res.status(200).json({ ok: true, data: subscription });
     } catch (error) {
+      await billingRepository.releasePendingCheckout(orderId, claimedCheckout.confirmationToken);
       if (error instanceof AppError) {
         const code = (error.code === "not_found" || error.code === "conflict" || error.code === "validation_error")
           ? error.code
