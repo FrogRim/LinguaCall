@@ -129,6 +129,15 @@ interface DbWebhookPayload {
   providerCallSid?: string;
 }
 
+interface DbPendingCheckoutRow {
+  order_id: string;
+  clerk_user_id: string;
+  plan_code: string;
+  amount: number;
+  confirmation_token: string | null;
+  completed_at: string | null;
+}
+
 interface DbSessionQueryResult {
   payload: DbWebhookPayload | null;
 }
@@ -1801,6 +1810,12 @@ class InMemoryStore {
     const successUrl = this.resolveCheckoutCallbackUrl("return", provider, payload.returnUrl);
     const failUrl = this.resolveCheckoutCallbackUrl("cancel", provider, payload.cancelUrl);
 
+    await this.pool.query(
+      `INSERT INTO pending_billing_checkouts (order_id, clerk_user_id, plan_code, amount, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, NOW(), NOW())`,
+      [checkoutSessionId, clerkUserId, requestedPlanCode, plan.price_krw]
+    );
+
     return {
       provider,
       checkoutSessionId,
@@ -1814,6 +1829,64 @@ class InMemoryStore {
       customerEmail: user.email ?? undefined,
       customerName: user.name ?? undefined
     };
+  }
+
+  async getPendingCheckoutByOrderId(orderId: string): Promise<{ orderId: string; clerkUserId: string; planCode: string; amount: number } | null> {
+    const result = await this.pool.query<DbPendingCheckoutRow>(
+      `SELECT order_id, clerk_user_id, plan_code, amount, confirmation_token, completed_at
+       FROM pending_billing_checkouts
+       WHERE order_id = $1
+       LIMIT 1`,
+      [orderId]
+    );
+    if (result.rows.length === 0 || result.rows[0].completed_at) {
+      return null;
+    }
+    return {
+      orderId: result.rows[0].order_id,
+      clerkUserId: result.rows[0].clerk_user_id,
+      planCode: result.rows[0].plan_code,
+      amount: result.rows[0].amount
+    };
+  }
+
+  async claimPendingCheckout(orderId: string): Promise<{ orderId: string; clerkUserId: string; planCode: string; amount: number; confirmationToken: string } | null> {
+    const confirmationToken = randomUUID();
+    const result = await this.pool.query<DbPendingCheckoutRow>(
+      `UPDATE pending_billing_checkouts
+       SET confirmation_token = $2, updated_at = NOW()
+       WHERE order_id = $1 AND completed_at IS NULL AND confirmation_token IS NULL
+       RETURNING order_id, clerk_user_id, plan_code, amount, confirmation_token, completed_at`,
+      [orderId, confirmationToken]
+    );
+    if (result.rows.length === 0 || !result.rows[0].confirmation_token) {
+      return null;
+    }
+    return {
+      orderId: result.rows[0].order_id,
+      clerkUserId: result.rows[0].clerk_user_id,
+      planCode: result.rows[0].plan_code,
+      amount: result.rows[0].amount,
+      confirmationToken: result.rows[0].confirmation_token
+    };
+  }
+
+  async releasePendingCheckout(orderId: string, confirmationToken: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE pending_billing_checkouts
+       SET confirmation_token = NULL, updated_at = NOW()
+       WHERE order_id = $1 AND completed_at IS NULL AND confirmation_token = $2`,
+      [orderId, confirmationToken]
+    );
+  }
+
+  async completePendingCheckout(orderId: string, confirmationToken: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE pending_billing_checkouts
+       SET completed_at = NOW(), confirmation_token = NULL, updated_at = NOW()
+       WHERE order_id = $1 AND confirmation_token = $2`,
+      [orderId, confirmationToken]
+    );
   }
 
   async handlePaymentWebhook(payload: BillingWebhookPayload): Promise<UserSubscription> {

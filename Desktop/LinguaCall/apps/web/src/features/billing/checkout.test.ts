@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { getFriendlyCopy } from "../../content/friendlyCopy";
 import {
   buildBillingReturnUrl,
   createCheckoutPayload,
   createTossPaymentRequest,
+  readBillingReturnState,
   readTossRedirectParams
 } from "./checkout";
 
@@ -46,6 +48,36 @@ test("readTossRedirectParams extracts Toss success query params from the URL sea
   });
 });
 
+test("readBillingReturnState keeps both Toss redirect params and billing hash params for confirm flow", () => {
+  const state = readBillingReturnState(
+    "https://linguacall.app/?paymentKey=pay_123&orderId=order_456&amount=9900#/billing?checkout=success&plan=basic"
+  );
+
+  assert.deepEqual(state, {
+    checkoutResult: "success",
+    checkoutPlan: "basic",
+    tossRedirect: {
+      paymentKey: "pay_123",
+      orderId: "order_456",
+      amount: 9900
+    },
+    shouldConfirm: true
+  });
+});
+
+test("readBillingReturnState does not request confirm on cancelled return", () => {
+  const state = readBillingReturnState(
+    "https://linguacall.app/#/billing?checkout=cancel&plan=basic"
+  );
+
+  assert.deepEqual(state, {
+    checkoutResult: "cancel",
+    checkoutPlan: "basic",
+    tossRedirect: null,
+    shouldConfirm: false
+  });
+});
+
 test("createTossPaymentRequest builds a redirect-based card payment request", () => {
   const request = createTossPaymentRequest({
     planCode: "basic",
@@ -74,4 +106,24 @@ test("createTossPaymentRequest builds a redirect-based card payment request", ()
       planCode: "basic"
     }
   });
+});
+
+test("billing trust points clearly describe the Toss-only launch path in Korean", () => {
+  const copy = getFriendlyCopy("ko");
+
+  assert.deepEqual(copy.billing.trustPoints, [
+    "토스 결제만 사용",
+    "짧은 세션 중심 설계",
+    "과장 없는 월 구독 안내"
+  ]);
+});
+
+test("billing trust points clearly describe the Toss-only launch path in English", () => {
+  const copy = getFriendlyCopy("en");
+
+  assert.deepEqual(copy.billing.trustPoints, [
+    "Toss Payments only",
+    "Built for short speaking sessions",
+    "Clear monthly billing"
+  ]);
 });

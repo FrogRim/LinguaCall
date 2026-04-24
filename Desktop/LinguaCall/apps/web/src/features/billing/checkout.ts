@@ -29,6 +29,13 @@ export interface TossCheckoutRequest {
   };
 }
 
+export interface BillingReturnState {
+  checkoutResult: BillingCheckoutResult | null;
+  checkoutPlan: string | null;
+  tossRedirect: TossRedirectParams | null;
+  shouldConfirm: boolean;
+}
+
 export const buildBillingReturnUrl = (
   originUrl: string,
   result: BillingCheckoutResult,
@@ -70,6 +77,25 @@ export const readTossRedirectParams = (
     paymentKey,
     orderId,
     amount: parsedAmount
+  };
+};
+
+export const readBillingReturnState = (
+  currentUrl: string
+): BillingReturnState => {
+  const url = new URL(currentUrl);
+  const hashQuery = url.hash.split("?")[1] ?? "";
+  const hashParams = new URLSearchParams(hashQuery);
+  const checkout = hashParams.get("checkout");
+  const checkoutResult = checkout === "success" || checkout === "cancel" ? checkout : null;
+  const checkoutPlan = hashParams.get("plan");
+  const tossRedirect = readTossRedirectParams(currentUrl);
+
+  return {
+    checkoutResult,
+    checkoutPlan,
+    tossRedirect,
+    shouldConfirm: checkoutResult === "success" && tossRedirect !== null
   };
 };
 

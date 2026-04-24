@@ -77,9 +77,9 @@ const COPY = {
       description:
         'The goal is not to buy the biggest plan. It is to find a monthly rhythm that feels light enough to keep using.',
       trustPoints: [
-        'Simple monthly pricing',
-        'Short-session friendly',
-        'Clear upgrade path when you want more minutes'
+        'Toss Payments only',
+        'Built for short speaking sessions',
+        'Clear monthly billing'
       ],
       currentPlanTitle: 'Your current access',
       currentPlanDescription:
@@ -174,7 +174,7 @@ const COPY = {
       title: '짧은 연습을 꾸준히 이어가기 쉬운 플랜을 고르세요.',
       description:
         '가장 큰 플랜을 사는 것이 목표가 아닙니다. 한 달 동안 무리 없이 계속 사용할 수 있는 리듬을 찾는 것이 더 중요합니다.',
-      trustPoints: ['단순한 월 구독 구조', '짧은 세션 중심 설계', '필요할 때만 자연스럽게 업그레이드'],
+      trustPoints: ['토스 결제만 사용', '짧은 세션 중심 설계', '과장 없는 월 구독 안내'],
       currentPlanTitle: '현재 이용 상태',
       currentPlanDescription:
         '지금 활성화된 플랜을 먼저 확인하고, 다음 단계가 필요할 때만 비교할 수 있게 구성했습니다.',

@@ -41,6 +41,17 @@ type DbSubscriptionRow = {
   updated_at: string;
 };
 
+type PendingBillingCheckout = {
+  orderId: string;
+  clerkUserId: string;
+  planCode: string;
+  amount: number;
+};
+
+type ClaimedPendingBillingCheckout = PendingBillingCheckout & {
+  confirmationToken: string;
+};
+
 const mapPlan = (row: DbPlanRow): BillingPlan => {
   return {
     id: row.id,
@@ -126,6 +137,22 @@ export const createBillingRepository = (db: Queryable) => ({
     payload: CreateCheckoutSessionPayload
   ): Promise<BillingCheckoutSession> {
     return store.createCheckoutSession(clerkUserId, payload);
+  },
+
+  getPendingCheckoutByOrderId(orderId: string): Promise<PendingBillingCheckout | null> {
+    return store.getPendingCheckoutByOrderId(orderId);
+  },
+
+  claimPendingCheckout(orderId: string): Promise<ClaimedPendingBillingCheckout | null> {
+    return store.claimPendingCheckout(orderId);
+  },
+
+  releasePendingCheckout(orderId: string, confirmationToken: string): Promise<void> {
+    return store.releasePendingCheckout(orderId, confirmationToken);
+  },
+
+  completePendingCheckout(orderId: string, confirmationToken: string): Promise<void> {
+    return store.completePendingCheckout(orderId, confirmationToken);
   },
 
   handleWebhook(payload: BillingWebhookPayload): Promise<UserSubscription> {

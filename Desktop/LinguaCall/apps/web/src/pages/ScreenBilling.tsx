@@ -1,39 +1,39 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import type { UserSubscription, BillingPlan } from '@lingua/shared';
+import type { UserSubscription, BillingPlan, BillingCheckoutSession } from '@lingua/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { cn } from '../components/ui/cn';
+import { StatusBanner } from '../components/layout/SectionCard';
 import { useUser } from '../context/UserContext';
 import { apiClient, describeApiError } from '../lib/api';
 import LanguagePicker from '../components/ui/LanguagePicker';
+import { getFriendlyCopy } from '../content/friendlyCopy';
+import { createCheckoutPayload, readBillingReturnState } from '../features/billing/checkout';
+import { startTossCheckout } from '../features/billing/toss';
 
 export default function ScreenBilling() {
-  const { t } = useTranslation();
-  const { getToken } = useUser();
+  const { i18n, t } = useTranslation();
+  const { getToken, refreshSession } = useUser();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const checkoutResult = searchParams.get('checkout') as 'success' | 'cancel' | null;
-  const checkoutProvider = searchParams.get('provider');
-  const checkoutPlan = searchParams.get('plan');
+  const returnState = readBillingReturnState(window.location.href);
+  const { checkoutResult, checkoutPlan, tossRedirect, shouldConfirm } = returnState;
+  const copy = getFriendlyCopy(i18n.language);
 
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [plans, setPlans] = useState<BillingPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [provider, setProvider] = useState('auto');
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [confirmingReturn, setConfirmingReturn] = useState(false);
+  const [confirmSuccess, setConfirmSuccess] = useState(false);
 
-  const buildReturnUrl = (result: 'success' | 'cancel', prov: string, planCode: string) => {
-    const base = window.location.href.split('#')[0];
-    return `${base}#/billing?checkout=${encodeURIComponent(result)}&provider=${encodeURIComponent(prov)}&plan=${encodeURIComponent(planCode)}`;
-  };
-
-  const load = async () => {
-    const api = apiClient(getToken);
+  const load = useCallback(async () => {
+    const api = apiClient(getToken, refreshSession);
     setLoading(true);
     setError('');
     try {
@@ -48,15 +48,15 @@ export default function ScreenBilling() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getToken, refreshSession]);
 
   useEffect(() => {
     void load();
-    if (checkoutProvider) setProvider(checkoutProvider);
-  }, []);
+  }, [load]);
 
   useEffect(() => {
     if (!checkoutResult) return;
+    if (shouldConfirm) return;
     const next = new URLSearchParams(searchParams);
     next.delete('checkout');
     next.delete('provider');
@@ -65,21 +65,50 @@ export default function ScreenBilling() {
       setSearchParams(next, { replace: true });
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [checkoutResult, searchParams, setSearchParams]);
+  }, [checkoutResult, searchParams, setSearchParams, shouldConfirm]);
+
+  useEffect(() => {
+    if (!shouldConfirm || !tossRedirect) return;
+
+    let cancelled = false;
+    const confirmReturn = async () => {
+      const api = apiClient(getToken, refreshSession);
+      setConfirmingReturn(true);
+      setError('');
+      try {
+        await api.post<UserSubscription>('/billing/toss/confirm', tossRedirect);
+        if (cancelled) return;
+        setConfirmSuccess(true);
+        await load();
+      } catch (err) {
+        if (cancelled) return;
+        setConfirmSuccess(false);
+        setError(describeApiError(err, 'billing_confirm'));
+      } finally {
+        if (!cancelled) {
+          setConfirmingReturn(false);
+          window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.hash.split('?')[0]}`);
+          const next = new URLSearchParams(searchParams);
+          next.delete('checkout');
+          next.delete('provider');
+          next.delete('plan');
+          setSearchParams(next, { replace: true });
+        }
+      }
+    };
+
+    void confirmReturn();
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken, load, refreshSession, searchParams, setSearchParams, shouldConfirm, tossRedirect]);
 
   const handleCheckout = async (planCode: string) => {
-    const api = apiClient(getToken);
+    const api = apiClient(getToken, refreshSession);
     setCheckoutLoading(planCode);
     try {
-      const payload: { planCode: string; provider?: string; returnUrl: string; cancelUrl: string } =
-        {
-          planCode,
-          returnUrl: buildReturnUrl('success', provider, planCode),
-          cancelUrl: buildReturnUrl('cancel', provider, planCode)
-        };
-      if (provider !== 'auto') payload.provider = provider;
-      const checkout = await api.post<{ checkoutUrl: string }>('/billing/checkout', payload);
-      window.location.href = checkout.checkoutUrl;
+      const checkout = await api.post<BillingCheckoutSession>('/billing/checkout', createCheckoutPayload(window.location.href, planCode));
+      await startTossCheckout(checkout);
     } catch (err) {
       setError(describeApiError(err, 'billing_checkout'));
     } finally {
@@ -100,22 +129,27 @@ export default function ScreenBilling() {
           </div>
         </div>
 
-        {checkoutResult === 'success' && (
-          <div className="rounded-md bg-primary/8 border border-primary/20 px-4 py-3 text-sm text-primary">
+        {confirmingReturn && (
+          <StatusBanner>
+            {t('common.confirming')}
+          </StatusBanner>
+        )}
+        {!confirmingReturn && confirmSuccess && checkoutResult === 'success' && (
+          <StatusBanner tone="success">
             {t('billing.checkoutSuccess', {
               plan: checkoutPlan ? t('billing.checkoutSuccessPlan', { plan: checkoutPlan }) : ''
             })}
-          </div>
+          </StatusBanner>
         )}
-        {checkoutResult === 'cancel' && (
-          <div className="rounded-md bg-secondary border border-border px-4 py-3 text-sm text-muted-foreground">
+        {!confirmingReturn && !shouldConfirm && checkoutResult === 'cancel' && (
+          <StatusBanner>
             {t('billing.checkoutCancelled')}
-          </div>
+          </StatusBanner>
         )}
         {error && (
-          <div className="rounded-md bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
+          <StatusBanner tone="danger">
             {error}
-          </div>
+          </StatusBanner>
         )}
 
         {/* Current Subscription */}
@@ -143,21 +177,26 @@ export default function ScreenBilling() {
           </CardContent>
         </Card>
 
-        {/* Provider selector */}
-        <div className="flex items-center gap-3">
-          <label className="text-sm text-muted-foreground whitespace-nowrap">
-            {t('billing.paymentProvider')}
-          </label>
-          <select
-            className="flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            value={provider}
-            onChange={e => setProvider(e.target.value)}
-          >
-            <option value="auto">{t('billing.providerAuto')}</option>
-            <option value="stripe">{t('billing.providerStripe')}</option>
-            <option value="mock">{t('billing.providerMock')}</option>
-          </select>
-        </div>
+        <Card>
+          <CardContent className="space-y-4 pt-6">
+            <div className="space-y-2">
+              <div className="inline-flex rounded-full border border-border bg-secondary px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                {copy.billing.eyebrow}
+              </div>
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight text-foreground">{copy.billing.title}</h2>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{copy.billing.description}</p>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {copy.billing.trustPoints.map(point => (
+                <div key={point} className="rounded-lg border border-border bg-secondary px-4 py-3 text-sm text-foreground">
+                  {point}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Plans */}
         <div>
@@ -203,9 +242,9 @@ export default function ScreenBilling() {
                         size="sm"
                         variant={isCurrent ? 'secondary' : 'default'}
                         onClick={() => void handleCheckout(plan.code)}
-                        disabled={checkoutLoading === plan.code}
+                        disabled={isCurrent || confirmingReturn || checkoutLoading === plan.code}
                       >
-                        {checkoutLoading === plan.code
+                        {checkoutLoading === plan.code || confirmingReturn
                           ? t('billing.processing')
                           : isCurrent
                           ? t('billing.currentPlan')
