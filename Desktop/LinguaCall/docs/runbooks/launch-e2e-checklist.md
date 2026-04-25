@@ -79,26 +79,62 @@ curl -I "https://APP_DOMAIN"
 
 상세 절차는 [`toss-sandbox-manual.md`](./toss-sandbox-manual.md)를 함께 본다.
 
+이 저장소의 현재 결제 모델은 **web visibility + Apps in Toss payment entry**다. 즉, 일반 브라우저의 `/#/billing`은 플랜 비교와 현재 구독 확인용이고, 실제 결제 시작은 Apps in Toss 내부에서만 허용된다.
+
 확인 순서:
 
+### 3.1 일반 웹 브라우저 모드
+
 1. 로그인 상태에서 `https://APP_DOMAIN/#/billing` 진입
-2. 플랜 선택
-3. Toss 결제 시작
-4. 샌드박스 결제 완료
-5. 앱으로 복귀
-6. 구독 상태가 갱신되었는지 확인
+2. 현재 구독 상태와 플랜 비교 UI 확인
+3. 유료 플랜 CTA가 비활성 상태인지 확인
+4. `플랜 변경은 Apps in Toss 안에서만 진행할 수 있습니다.` 같은 안내 문구 확인
 
 예상 API 호출:
 
-- `POST /billing/checkout`
-- `POST /billing/toss/confirm`
+- `GET /billing/plans`
 - `GET /billing/subscription`
 
 기대 결과:
 
-- checkout 시작 성공
-- confirm 성공
-- 현재 플랜 상태가 별도 수작업 없이 갱신됨
+- web에서 checkout을 직접 시작하지 않음
+- dead CTA 없이 Apps in Toss 진입 필요성이 명확히 보임
+- `POST /billing/checkout` 또는 `POST /billing/toss/confirm`이 브라우저 플로우에서 발생하지 않음
+
+### 3.2 Apps in Toss 호스트 모드
+
+1. Apps in Toss 내부 진입 경로로 `/#/billing` 열기
+2. 상단의 in-app payment 준비 notice 확인
+3. 유료 플랜 CTA 활성화 확인
+4. 플랜 선택 후 인앱 결제 handoff 시작
+5. 샌드박스 결제 완료
+6. webhook 처리 후 현재 구독 상태 갱신 확인
+
+예상 API 호출:
+
+- `GET /billing/plans`
+- `GET /billing/subscription`
+- `POST /billing/apps-in-toss/verify-session`
+- `POST /billing/apps-in-toss/payment-launch`
+- `POST /billing/webhooks/toss`
+- `GET /billing/subscription` (갱신 확인)
+
+기대 결과:
+
+- verify-session 성공 후에만 payment launch payload 준비 성공
+- Apps in Toss bridge를 통해 인앱 결제로 이어짐
+- webhook 이후 현재 플랜 상태가 별도 수작업 없이 갱신됨
+
+### 3.3 레거시/예외 상태
+
+1. 예전 billing success/cancel 복귀 URL로 `/#/billing` 재진입
+2. success / cancel 별 안내 문구가 과장 없이 보이는지 확인
+3. Apps in Toss host hint는 있으나 bridge가 없는 환경이면 재진입 안내 문구가 보이는지 확인
+
+기대 결과:
+
+- 레거시 복귀 링크가 primary 결제 경로처럼 보이지 않음
+- unsupported host에서도 다음 행동이 분명함
 
 ## 4. 세션 생성 확인
 
@@ -187,6 +223,6 @@ Go:
 No-Go:
 
 - 로그인 완료 불가
-- 결제 confirm 실패
+- Apps in Toss launch 준비 또는 webhook 반영 실패
 - 라이브 세션 시작 또는 종료 실패
 - 리포트가 생성되지 않음

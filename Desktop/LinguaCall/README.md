@@ -123,9 +123,11 @@ External providers:
 
 ### Billing
 
-1. web requests Toss checkout
-2. Toss confirm/webhook reaches the API
-3. subscription and credit ledger state update in Postgres
+1. web shows plan comparison and current subscription visibility only
+2. Apps in Toss host runs `appLogin`, then calls `POST /billing/apps-in-toss/verify-session`
+3. only recently verified sessions can call `POST /billing/apps-in-toss/payment-launch`
+4. Toss webhook reaches the API after the in-app payment completes
+5. subscription and credit ledger state update in Postgres
 
 ## Runtime Services
 
@@ -176,7 +178,8 @@ DELETE /sessions/:id
 
 GET  /billing/plans
 GET  /billing/subscription
-POST /billing/checkout
+POST /billing/apps-in-toss/verify-session
+POST /billing/apps-in-toss/payment-launch
 POST /billing/webhooks/toss
 
 POST /workers/run
@@ -214,6 +217,7 @@ OPENAI_EVAL_MODEL=gpt-4.1-mini
 
 TOSS_CLIENT_KEY=...
 TOSS_SECRET_KEY=...
+APPS_IN_TOSS_PARTNER_API_KEY=...
 
 WORKER_SHARED_SECRET=replace-me
 WORKER_BATCH_INTERVAL_MS=30000

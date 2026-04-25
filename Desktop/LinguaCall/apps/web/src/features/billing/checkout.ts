@@ -1,3 +1,7 @@
+import type { AppsInTossPaymentLaunchSession } from '@lingua/shared';
+import { canLaunchAppsInTossPayment, HostBridgeError, launchAppsInTossPayment, requestAppsInTossLogin } from '../../lib/hostBridge';
+import type { HostRuntime } from '../../lib/hostRuntime';
+
 export type BillingCheckoutResult = "success" | "cancel";
 
 export interface BillingCheckoutPayload {
@@ -34,6 +38,7 @@ export interface BillingReturnState {
   checkoutPlan: string | null;
   tossRedirect: TossRedirectParams | null;
   shouldConfirm: boolean;
+  hasLegacyReturn: boolean;
 }
 
 export const buildBillingReturnUrl = (
@@ -95,7 +100,8 @@ export const readBillingReturnState = (
     checkoutResult,
     checkoutPlan,
     tossRedirect,
-    shouldConfirm: checkoutResult === "success" && tossRedirect !== null
+    shouldConfirm: checkoutResult === "success" && tossRedirect !== null,
+    hasLegacyReturn: checkoutResult !== null || tossRedirect !== null
   };
 };
 
@@ -126,3 +132,57 @@ export const createTossPaymentRequest = (checkout: {
     }
   };
 };
+
+type AppsInTossLoginResult = {
+  authorizationCode?: string;
+  authorization_code?: string;
+  referrer?: string;
+};
+
+type AppsInTossVerifySessionPayload = {
+  authorizationCode: string;
+  referrer: string;
+};
+
+const readAppsInTossLoginResult = (
+  value: unknown
+): AppsInTossVerifySessionPayload => {
+  if (!value || typeof value !== 'object') {
+    throw new HostBridgeError('login_failed', 'Apps in Toss login verification payload is missing');
+  }
+
+  const payload = value as AppsInTossLoginResult;
+  const authorizationCode = typeof payload.authorizationCode === 'string'
+    ? payload.authorizationCode.trim()
+    : typeof payload.authorization_code === 'string'
+      ? payload.authorization_code.trim()
+      : '';
+  const referrer = typeof payload.referrer === 'string' ? payload.referrer.trim() : '';
+
+  if (!authorizationCode || !referrer) {
+    throw new HostBridgeError('login_failed', 'Apps in Toss login verification payload is incomplete');
+  }
+
+  return { authorizationCode, referrer };
+};
+
+export async function startAppsInTossBillingLaunch(
+  options: {
+    apiPost: <TResponse>(url: string, body: object) => Promise<TResponse>;
+    runtime: HostRuntime;
+    originUrl: string;
+    planCode: string;
+  }
+): Promise<void> {
+  if (!canLaunchAppsInTossPayment(options.runtime)) {
+    throw new HostBridgeError("payment_not_supported", "Apps in Toss payment bridge is unavailable");
+  }
+
+  const loginResult = await requestAppsInTossLogin(options.runtime);
+  const verifyPayload = readAppsInTossLoginResult(loginResult);
+  await options.apiPost<{ verified: true }>("/billing/apps-in-toss/verify-session", verifyPayload);
+
+  const payload = createCheckoutPayload(options.originUrl, options.planCode);
+  const session = await options.apiPost<AppsInTossPaymentLaunchSession>("/billing/apps-in-toss/payment-launch", payload);
+  await launchAppsInTossPayment(session, options.runtime);
+}

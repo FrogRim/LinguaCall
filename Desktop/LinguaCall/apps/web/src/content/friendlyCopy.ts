@@ -15,10 +15,11 @@ const COPY = {
       bullets: [
         'Start with a short session instead of a long study block.',
         'Use phone OTP once, then stay signed in on your device.',
-        'Move from practice to paid plans only when it feels worth it.'
+        'If you decide to upgrade, compare plans first and complete payment in Apps in Toss.'
       ],
       primaryCta: 'Start with phone verification',
-      secondaryCta: 'See plans first',
+      secondaryCta: 'Compare plans first',
+      secondaryCtaAppsInToss: 'Compare plans in Apps in Toss',
       valueTitle: 'Why people trust it',
       valueSummary:
         'The product keeps the first step small: one number, one quick call, one clear next action.'
@@ -32,11 +33,11 @@ const COPY = {
       steps: [
         'Enter your number and request a one-time code.',
         'Confirm the code to create your secure session.',
-        'Start a short practice call or browse plans when you are ready.'
+        'Start a short practice call now, or compare plans first and complete any upgrade in Apps in Toss.'
       ],
       supportTitle: 'Built to feel low pressure',
       supportCopy:
-        'You are not signing up for a complicated platform. The goal is to let you start speaking quickly.'
+        'The goal is to get you speaking quickly. If you later need a plan change, the payment step continues inside Apps in Toss.'
     },
     session: {
       eyebrow: 'Practice hub',
@@ -73,20 +74,29 @@ const COPY = {
     },
     billing: {
       eyebrow: 'Plans and billing',
-      title: 'Choose the plan that makes short, repeatable practice easy to keep.',
+      title: 'Check your access here, then complete payment inside Apps in Toss.',
       description:
-        'The goal is not to buy the biggest plan. It is to find a monthly rhythm that feels light enough to keep using.',
+        'The web billing page stays available for plan and subscription visibility, but new payments now open only inside Apps in Toss.',
       trustPoints: [
-        'Toss Payments only',
-        'Built for short speaking sessions',
-        'Clear monthly billing'
+        'Apps in Toss payment only',
+        'Subscription status stays visible on web',
+        'No web checkout is started here'
       ],
       currentPlanTitle: 'Your current access',
       currentPlanDescription:
-        'See what is active now, then compare the next step without digging through account settings.',
-      plansTitle: 'Choose the pace that feels sustainable',
+        'Review what is active now and use Apps in Toss when you need to change plans.',
+      plansTitle: 'Plans you can compare before entering Apps in Toss',
       plansDescription:
-        'Each plan is framed around short calls, repeat practice, and a clear monthly limit.'
+        'Plan details stay visible on web so you can review them calmly before paying in the Toss app.',
+      planActionLabel: 'Continue in Apps in Toss',
+      planActionWebNote: 'Plan changes stay available only inside Apps in Toss.',
+      planActionUnavailableNote: 'Reopen this page from Apps in Toss to continue with payment.',
+      launchFailedNotice: 'Apps in Toss could not open the payment handoff just now. Please try again from the latest in-app entry.',
+      appsInTossReadyNotice: 'You are inside Apps in Toss. Choose a plan below to continue with in-app payment.',
+      hostUnavailableNotice: 'This page looks like it opened from Toss, but the payment bridge is not available here yet. Reopen it from the latest Apps in Toss entry.',
+      legacyReturnNotice: 'This older web billing return link is no longer used. New plan changes now continue inside Apps in Toss.',
+      legacyReturnSuccessNotice: 'This older web success return opened correctly, but plan changes now continue inside Apps in Toss. Refresh your current access below if needed.',
+      legacyReturnCancelNotice: 'This older web cancel return is no longer the main flow. When you are ready, reopen billing inside Apps in Toss.'
     },
     report: {
       eyebrow: 'Practice report',
@@ -113,10 +123,11 @@ const COPY = {
       bullets: [
         '긴 학습 블록 대신 짧은 통화 세션으로 시작합니다.',
         '전화번호 OTP를 한 번만 거치면 이 기기에서 로그인 상태를 유지합니다.',
-        '유료 플랜은 직접 써보고 가치가 느껴질 때 선택하면 됩니다.'
+        '유료 전환이 필요하면 플랜을 비교한 뒤 결제는 Apps in Toss에서 진행합니다.'
       ],
       primaryCta: '전화번호로 시작하기',
-      secondaryCta: '플랜 먼저 보기',
+      secondaryCta: '플랜 비교해보기',
+      secondaryCtaAppsInToss: 'Apps in Toss에서 플랜 비교하기',
       valueTitle: '신뢰감을 먼저 만드는 이유',
       valueSummary:
         '처음 단계는 작아야 합니다. 번호 입력, 짧은 통화, 다음 행동 하나만 명확하면 됩니다.'
@@ -130,11 +141,11 @@ const COPY = {
       steps: [
         '전화번호를 입력하고 인증 코드를 받습니다.',
         '코드를 확인하면 안전한 로그인 세션이 만들어집니다.',
-        '즉시 통화를 시작하거나, 준비가 되면 플랜을 비교할 수 있습니다.'
+        '바로 짧은 통화를 시작하거나, 유료 전환이 필요하면 플랜을 비교한 뒤 Apps in Toss에서 이어서 진행합니다.'
       ],
       supportTitle: '복잡한 가입 흐름을 만들지 않습니다',
       supportCopy:
-        '중요한 건 빨리 말하기 연습을 시작하는 것입니다. 인증 과정도 그 흐름을 방해하지 않아야 합니다.'
+        '중요한 건 빨리 말하기 연습을 시작하는 것입니다. 나중에 플랜 변경이 필요해도 결제는 Apps in Toss 안에서 이어집니다.'
     },
     session: {
       eyebrow: '연습 허브',
@@ -171,16 +182,25 @@ const COPY = {
     },
     billing: {
       eyebrow: '플랜과 결제',
-      title: '짧은 연습을 꾸준히 이어가기 쉬운 플랜을 고르세요.',
+      title: '웹에서는 이용 상태만 확인하고, 결제는 Apps in Toss 안에서 진행합니다.',
       description:
-        '가장 큰 플랜을 사는 것이 목표가 아닙니다. 한 달 동안 무리 없이 계속 사용할 수 있는 리듬을 찾는 것이 더 중요합니다.',
-      trustPoints: ['토스 결제만 사용', '짧은 세션 중심 설계', '과장 없는 월 구독 안내'],
+        '웹 결제 진입은 중단했고, 현재 페이지는 플랜 비교와 구독 상태 확인용으로만 유지합니다. 실제 결제 변경은 Apps in Toss에서 진행합니다.',
+      trustPoints: ['Apps in Toss 전용 결제', '웹에서도 구독 상태 확인 가능', '여기서는 웹 체크아웃을 시작하지 않음'],
       currentPlanTitle: '현재 이용 상태',
       currentPlanDescription:
-        '지금 활성화된 플랜을 먼저 확인하고, 다음 단계가 필요할 때만 비교할 수 있게 구성했습니다.',
-      plansTitle: '지속 가능한 속도로 선택하기',
+        '지금 활성화된 플랜을 먼저 확인하고, 변경이 필요하면 Apps in Toss에서 이어서 진행하면 됩니다.',
+      plansTitle: 'Apps in Toss로 들어가기 전에 플랜 비교하기',
       plansDescription:
-        '각 플랜은 짧은 통화, 반복 연습, 명확한 월 사용량을 기준으로 설계되어 있습니다.'
+        '웹에서는 플랜 내용을 차분히 비교만 하고, 실제 결제는 토스 앱 안에서 안전하게 진행합니다.',
+      planActionLabel: 'Apps in Toss에서 이어서 진행',
+      planActionWebNote: '플랜 변경은 Apps in Toss 안에서만 진행할 수 있습니다.',
+      planActionUnavailableNote: '결제를 이어가려면 Apps in Toss 최신 진입 경로에서 이 페이지를 다시 열어 주세요.',
+      launchFailedNotice: '지금은 Apps in Toss 결제 연결을 열지 못했습니다. 최신 인앱 진입 경로에서 다시 시도해 주세요.',
+      appsInTossReadyNotice: '현재 Apps in Toss 안에 있습니다. 아래에서 플랜을 선택하면 인앱 결제로 이어집니다.',
+      hostUnavailableNotice: '토스에서 열린 페이지처럼 보이지만 결제 브리지가 아직 연결되지 않았습니다. 최신 Apps in Toss 진입 경로에서 다시 열어 주세요.',
+      legacyReturnNotice: '이전 웹 결제 복귀 링크는 더 이상 메인 경로가 아닙니다. 이제 플랜 변경은 Apps in Toss 안에서 진행합니다.',
+      legacyReturnSuccessNotice: '이전 웹 성공 복귀 링크로 돌아왔지만, 이제 플랜 변경은 Apps in Toss 안에서 이어집니다. 필요하면 아래에서 현재 이용 상태를 새로고침해 확인해 주세요.',
+      legacyReturnCancelNotice: '이전 웹 취소 복귀 경로가 열렸습니다. 다시 진행하려면 Apps in Toss 안에서 빌링을 열어 주세요.'
     },
     report: {
       eyebrow: '연습 리포트',

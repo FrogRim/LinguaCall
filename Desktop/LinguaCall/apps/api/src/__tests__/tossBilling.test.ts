@@ -59,7 +59,7 @@ vi.mock("../storage/inMemoryStore", () => {
 
 import billingRouter from "../routes/billing";
 
-describe("billing toss-only flow", () => {
+describe("billing web gating", () => {
   beforeEach(() => {
     mocked.createCheckoutSessionMock.mockReset();
     mocked.handlePaymentWebhookMock.mockReset();
@@ -69,41 +69,171 @@ describe("billing toss-only flow", () => {
     mocked.completePendingCheckoutMock.mockReset();
   });
 
-  it("rejects non-toss provider checkout requests", async () => {
-    mocked.createCheckoutSessionMock.mockResolvedValue({
-      provider: "stripe",
-      checkoutSessionId: "cs_123",
-      checkoutUrl: "https://checkout.example/stripe",
-      planCode: "basic"
-    });
+  it("blocks Apps in Toss payment launch until the host session has been server-verified", async () => {
+    const originalAllowedOrigins = process.env.ALLOWED_ORIGINS;
+    process.env.ALLOWED_ORIGINS = "https://linguacall.app";
 
     const app = express();
     app.use(express.json());
     app.use("/billing", billingRouter);
 
-    const response = await request(app)
-      .post("/billing/checkout")
-      .send({ planCode: "basic", provider: "stripe" });
+    try {
+      const response = await request(app)
+        .post("/billing/apps-in-toss/payment-launch")
+        .send({
+          planCode: "basic",
+          returnUrl: "https://linguacall.app/#/billing?checkout=success&plan=basic",
+          cancelUrl: "https://linguacall.app/#/billing?checkout=cancel&plan=basic"
+        });
 
-    expect(response.status).toBe(422);
-    expect(mocked.createCheckoutSessionMock).not.toHaveBeenCalled();
+      expect(response.status).toBe(403);
+      expect(response.body.error).toMatchObject({
+        code: "apps_in_toss_verification_required",
+        message: "Apps in Toss verification required before payment launch"
+      });
+      expect(mocked.createCheckoutSessionMock).not.toHaveBeenCalled();
+    } finally {
+      process.env.ALLOWED_ORIGINS = originalAllowedOrigins;
+    }
   });
 
-  it("returns Toss widget checkout data for the billing screen", async () => {
+  it("verifies an Apps in Toss host session and then creates a payment launch payload", async () => {
+    const originalAllowedOrigins = process.env.ALLOWED_ORIGINS;
+    const originalFetch = global.fetch;
+    process.env.ALLOWED_ORIGINS = "https://linguacall.app";
     mocked.createCheckoutSessionMock.mockResolvedValue({
       provider: "toss",
       checkoutSessionId: "order_basic_123",
-      checkoutUrl: "https://checkout.example/toss",
       planCode: "basic",
       orderId: "order_basic_123",
       orderName: "Basic Plan",
       amount: 9900,
       successUrl: "https://linguacall.app/#/billing?checkout=success&plan=basic",
       failUrl: "https://linguacall.app/#/billing?checkout=cancel&plan=basic",
+      customerKey: "user_123",
       customerEmail: "user@example.com",
       customerName: "Lingua User"
     });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ accessToken: "apps_in_toss_access_token" })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ userKey: "toss-user-1" })
+      });
+    global.fetch = fetchMock as typeof fetch;
 
+    const app = express();
+    app.use(express.json());
+    app.use("/billing", billingRouter);
+
+    try {
+      const verifyResponse = await request(app)
+        .post("/billing/apps-in-toss/verify-session")
+        .send({
+          authorizationCode: "auth_code_123",
+          referrer: "tossapp://miniapp"
+        });
+
+      expect(verifyResponse.status).toBe(200);
+      expect(verifyResponse.body.ok).toBe(true);
+
+      const launchResponse = await request(app)
+        .post("/billing/apps-in-toss/payment-launch")
+        .send({
+          planCode: "basic",
+          returnUrl: "https://linguacall.app/#/billing?checkout=success&plan=basic",
+          cancelUrl: "https://linguacall.app/#/billing?checkout=cancel&plan=basic"
+        });
+
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        1,
+        "https://apps-in-toss-api.toss.im/api-partner/v1/apps-in-toss/user/oauth2/generate-token",
+        expect.objectContaining({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            authorizationCode: "auth_code_123",
+            referrer: "tossapp://miniapp"
+          })
+        })
+      );
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        2,
+        "https://apps-in-toss-api.toss.im/api-partner/v1/apps-in-toss/user/oauth2/login-me",
+        expect.objectContaining({
+          headers: { Authorization: "Bearer apps_in_toss_access_token" }
+        })
+      );
+      expect(launchResponse.status).toBe(200);
+      expect(launchResponse.body).toMatchObject({
+        ok: true,
+        data: {
+          provider: "toss",
+          orderId: "order_basic_123",
+          orderName: "Basic Plan",
+          amount: 9900,
+          successUrl: "https://linguacall.app/#/billing?checkout=success&plan=basic",
+          failUrl: "https://linguacall.app/#/billing?checkout=cancel&plan=basic",
+          customerKey: "user_123",
+          customerEmail: "user@example.com",
+          customerName: "Lingua User",
+          planCode: "basic"
+        }
+      });
+      expect(mocked.createCheckoutSessionMock).toHaveBeenCalledWith("local:user-1", {
+        planCode: "basic",
+        returnUrl: "https://linguacall.app/#/billing?checkout=success&plan=basic",
+        cancelUrl: "https://linguacall.app/#/billing?checkout=cancel&plan=basic"
+      });
+    } finally {
+      global.fetch = originalFetch;
+      process.env.ALLOWED_ORIGINS = originalAllowedOrigins;
+    }
+  });
+
+  it("rejects Apps in Toss launch callback URLs outside trusted origins", async () => {
+    const originalAllowedOrigins = process.env.ALLOWED_ORIGINS;
+    process.env.ALLOWED_ORIGINS = "https://linguacall.app";
+    mocked.createCheckoutSessionMock.mockResolvedValue({
+      provider: "toss",
+      checkoutSessionId: "order_basic_123",
+      planCode: "basic",
+      orderId: "order_basic_123",
+      orderName: "Basic Plan",
+      amount: 9900,
+      successUrl: "https://evil.example/return",
+      failUrl: "https://linguacall.app/#/billing?checkout=cancel&plan=basic",
+      customerKey: "user_123"
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/billing", billingRouter);
+
+    try {
+      const response = await request(app)
+        .post("/billing/apps-in-toss/payment-launch")
+        .send({
+          planCode: "basic",
+          returnUrl: "https://evil.example/return",
+          cancelUrl: "https://linguacall.app/#/billing?checkout=cancel&plan=basic"
+        });
+
+      expect(response.status).toBe(422);
+      expect(response.body.error).toMatchObject({
+        code: "validation_error",
+        message: "untrusted billing callback url"
+      });
+      expect(mocked.createCheckoutSessionMock).not.toHaveBeenCalled();
+    } finally {
+      process.env.ALLOWED_ORIGINS = originalAllowedOrigins;
+    }
+  });
+
+  it("blocks web checkout requests and does not create a checkout session", async () => {
     const app = express();
     app.use(express.json());
     app.use("/billing", billingRouter);
@@ -116,141 +246,17 @@ describe("billing toss-only flow", () => {
         cancelUrl: "https://linguacall.app/#/billing?checkout=cancel&plan=basic"
       });
 
-    expect(response.status).toBe(200);
-    expect(response.body.data).toMatchObject({
-      provider: "toss",
-      orderId: "order_basic_123",
-      orderName: "Basic Plan",
-      amount: 9900,
-      successUrl: "https://linguacall.app/#/billing?checkout=success&plan=basic",
-      failUrl: "https://linguacall.app/#/billing?checkout=cancel&plan=basic"
+    expect(response.status).toBe(403);
+    expect(response.body.error).toMatchObject({
+      code: "forbidden",
+      message: "web checkout is disabled; complete payment inside Apps in Toss"
     });
+    expect(mocked.createCheckoutSessionMock).not.toHaveBeenCalled();
   });
 
-  it("drops untrusted return and cancel URLs before creating a checkout session", async () => {
-    mocked.createCheckoutSessionMock.mockResolvedValue({
-      provider: "toss",
-      checkoutSessionId: "order_basic_123",
-      planCode: "basic",
-      orderId: "order_basic_123",
-      orderName: "Basic Plan",
-      amount: 9900,
-      successUrl: "https://linguacall.app/#/billing?checkout=success&plan=basic",
-      failUrl: "https://linguacall.app/#/billing?checkout=cancel&plan=basic"
-    });
-
-    const originalAllowedOrigins = process.env.ALLOWED_ORIGINS;
-    process.env.ALLOWED_ORIGINS = "https://linguacall.app";
-
-    const app = express();
-    app.use(express.json());
-    app.use("/billing", billingRouter);
-
-    try {
-      const response = await request(app)
-        .post("/billing/checkout")
-        .send({
-          planCode: "basic",
-          returnUrl: "https://evil.example/steal",
-          cancelUrl: "https://evil.example/cancel"
-        });
-
-      expect(response.status).toBe(200);
-    } finally {
-      process.env.ALLOWED_ORIGINS = originalAllowedOrigins;
-    }
-    expect(mocked.createCheckoutSessionMock).toHaveBeenCalledWith(
-      "local:user-1",
-      expect.objectContaining({
-        planCode: "basic",
-        returnUrl: undefined,
-        cancelUrl: undefined
-      })
-    );
-  });
-
-  it("confirms Toss payments using the pending checkout plan instead of orderName", async () => {
-    mocked.getPendingCheckoutMock.mockResolvedValue({
-      orderId: "order_basic_123",
-      clerkUserId: "local:user-1",
-      planCode: "basic",
-      amount: 9900
-    });
-    mocked.claimPendingCheckoutMock.mockResolvedValue({
-      orderId: "order_basic_123",
-      clerkUserId: "local:user-1",
-      planCode: "basic",
-      amount: 9900,
-      confirmationToken: "claim_123"
-    });
-    mocked.completePendingCheckoutMock.mockResolvedValue(undefined);
-    mocked.handlePaymentWebhookMock.mockResolvedValue({
-      id: "sub_123",
-      userId: "user-1",
-      provider: "toss",
-      providerSubscriptionId: "order_basic_123",
-      planCode: "basic",
-      status: "active",
-      cancelAtPeriodEnd: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    });
-
-    const originalSecret = process.env.TOSS_SECRET_KEY;
+  it("blocks legacy web confirm requests and does not touch pending checkout state", async () => {
     const originalFetch = global.fetch;
-    process.env.TOSS_SECRET_KEY = "test_secret";
-    global.fetch = vi.fn(async () => {
-      return {
-        ok: true,
-        json: async () => ({
-          orderName: "Basic Plan"
-        })
-      } as Response;
-    }) as typeof fetch;
-
-    const app = express();
-    app.use(express.json());
-    app.use("/billing", billingRouter);
-
-    try {
-      const response = await request(app)
-        .post("/billing/toss/confirm")
-        .send({ paymentKey: "pay_123", orderId: "order_basic_123", amount: 9900 });
-
-      expect(response.status).toBe(200);
-      expect(mocked.handlePaymentWebhookMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          clerkUserId: "local:user-1",
-          providerSubscriptionId: "order_basic_123",
-          planCode: "basic"
-        })
-      );
-    } finally {
-      process.env.TOSS_SECRET_KEY = originalSecret;
-      global.fetch = originalFetch;
-    }
-  });
-
-  it("does not call Toss confirm when the pending checkout belongs to another user", async () => {
-    mocked.getPendingCheckoutMock.mockResolvedValue({
-      orderId: "order_basic_123",
-      clerkUserId: "local:other-user",
-      planCode: "basic",
-      amount: 9900
-    });
-
-    const originalSecret = process.env.TOSS_SECRET_KEY;
-    const originalFetch = global.fetch;
-    process.env.TOSS_SECRET_KEY = "test_secret";
-    const fetchMock = vi.fn(async () => {
-      return {
-        ok: true,
-        json: async () => ({
-          metadata: { planCode: "pro" },
-          orderName: "Pro Plan"
-        })
-      } as Response;
-    });
+    const fetchMock = vi.fn();
     global.fetch = fetchMock as typeof fetch;
 
     const app = express();
@@ -262,124 +268,16 @@ describe("billing toss-only flow", () => {
         .post("/billing/toss/confirm")
         .send({ paymentKey: "pay_123", orderId: "order_basic_123", amount: 9900 });
 
-      expect(response.status).toBe(422);
+      expect(response.status).toBe(403);
+      expect(response.body.error).toMatchObject({
+        code: "forbidden",
+        message: "web payment confirmation is disabled; complete payment inside Apps in Toss"
+      });
       expect(fetchMock).not.toHaveBeenCalled();
+      expect(mocked.getPendingCheckoutMock).not.toHaveBeenCalled();
+      expect(mocked.claimPendingCheckoutMock).not.toHaveBeenCalled();
       expect(mocked.handlePaymentWebhookMock).not.toHaveBeenCalled();
     } finally {
-      process.env.TOSS_SECRET_KEY = originalSecret;
-      global.fetch = originalFetch;
-    }
-  });
-
-  it("does not call Toss confirm when the checkout amount does not match", async () => {
-    mocked.getPendingCheckoutMock.mockResolvedValue({
-      orderId: "order_basic_123",
-      clerkUserId: "local:user-1",
-      planCode: "basic",
-      amount: 9900
-    });
-
-    const originalSecret = process.env.TOSS_SECRET_KEY;
-    const originalFetch = global.fetch;
-    process.env.TOSS_SECRET_KEY = "test_secret";
-    const fetchMock = vi.fn(async () => {
-      return {
-        ok: true,
-        json: async () => ({
-          orderName: "Basic Plan"
-        })
-      } as Response;
-    });
-    global.fetch = fetchMock as typeof fetch;
-
-    const app = express();
-    app.use(express.json());
-    app.use("/billing", billingRouter);
-
-    try {
-      const response = await request(app)
-        .post("/billing/toss/confirm")
-        .send({ paymentKey: "pay_123", orderId: "order_basic_123", amount: 19900 });
-
-      expect(response.status).toBe(422);
-      expect(fetchMock).not.toHaveBeenCalled();
-      expect(mocked.handlePaymentWebhookMock).not.toHaveBeenCalled();
-    } finally {
-      process.env.TOSS_SECRET_KEY = originalSecret;
-      global.fetch = originalFetch;
-    }
-  });
-
-  it("does not call Toss confirm when the checkout session is missing", async () => {
-    mocked.getPendingCheckoutMock.mockResolvedValue(null);
-
-    const originalSecret = process.env.TOSS_SECRET_KEY;
-    const originalFetch = global.fetch;
-    process.env.TOSS_SECRET_KEY = "test_secret";
-    const fetchMock = vi.fn(async () => {
-      return {
-        ok: true,
-        json: async () => ({
-          orderName: "Basic Plan"
-        })
-      } as Response;
-    });
-    global.fetch = fetchMock as typeof fetch;
-
-    const app = express();
-    app.use(express.json());
-    app.use("/billing", billingRouter);
-
-    try {
-      const response = await request(app)
-        .post("/billing/toss/confirm")
-        .send({ paymentKey: "pay_123", orderId: "order_basic_123", amount: 9900 });
-
-      expect(response.status).toBe(422);
-      expect(fetchMock).not.toHaveBeenCalled();
-      expect(mocked.handlePaymentWebhookMock).not.toHaveBeenCalled();
-    } finally {
-      process.env.TOSS_SECRET_KEY = originalSecret;
-      global.fetch = originalFetch;
-    }
-  });
-
-  it("does not call Toss confirm when another request already claimed the checkout", async () => {
-    mocked.getPendingCheckoutMock.mockResolvedValue({
-      orderId: "order_basic_123",
-      clerkUserId: "local:user-1",
-      planCode: "basic",
-      amount: 9900
-    });
-    mocked.claimPendingCheckoutMock.mockResolvedValue(null);
-
-    const originalSecret = process.env.TOSS_SECRET_KEY;
-    const originalFetch = global.fetch;
-    process.env.TOSS_SECRET_KEY = "test_secret";
-    const fetchMock = vi.fn(async () => {
-      return {
-        ok: true,
-        json: async () => ({
-          orderName: "Basic Plan"
-        })
-      } as Response;
-    });
-    global.fetch = fetchMock as typeof fetch;
-
-    const app = express();
-    app.use(express.json());
-    app.use("/billing", billingRouter);
-
-    try {
-      const response = await request(app)
-        .post("/billing/toss/confirm")
-        .send({ paymentKey: "pay_123", orderId: "order_basic_123", amount: 9900 });
-
-      expect(response.status).toBe(409);
-      expect(fetchMock).not.toHaveBeenCalled();
-      expect(mocked.handlePaymentWebhookMock).not.toHaveBeenCalled();
-    } finally {
-      process.env.TOSS_SECRET_KEY = originalSecret;
       global.fetch = originalFetch;
     }
   });

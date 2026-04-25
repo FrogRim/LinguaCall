@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate, Link } from 'react-router-dom';
+import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { UserProvider, useUser } from './context/UserContext';
 import ScreenLogin from './pages/ScreenLogin';
@@ -27,9 +28,31 @@ function Footer() {
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, sessionChecked } = useUser();
+  const location = useLocation();
   if (!sessionChecked) return null;
-  if (!isAuthenticated) return <Navigate to="/" replace />;
+  if (!isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
   return <>{children}</>;
+}
+
+function LegacyBillingReturnScrubber() {
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const hasTossReturnParams =
+      url.searchParams.has('paymentKey') ||
+      url.searchParams.has('orderId') ||
+      url.searchParams.has('amount');
+    if (!hasTossReturnParams) return;
+
+    url.searchParams.delete('paymentKey');
+    url.searchParams.delete('orderId');
+    url.searchParams.delete('amount');
+    const cleanUrl = `${url.pathname}${url.search}${url.hash}`;
+    window.history.replaceState({}, document.title, cleanUrl);
+  }, []);
+
+  return null;
 }
 
 function VerifyGate() {
@@ -43,6 +66,7 @@ export default function App() {
   return (
     <UserProvider>
       <div className="min-h-screen">
+        <LegacyBillingReturnScrubber />
         <Routes>
           <Route path="/" element={<ScreenLogin />} />
           <Route path="/verify" element={<VerifyGate />} />

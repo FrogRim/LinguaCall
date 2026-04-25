@@ -6,12 +6,17 @@ import AuthLayout from '../components/layout/AuthLayout';
 import { Button } from '../components/ui/button';
 import { getFriendlyCopy } from '../content/friendlyCopy';
 import { useUser } from '../context/UserContext';
+import { getHostRuntime } from '../lib/hostRuntime';
 
 export default function ScreenLogin() {
   const { i18n } = useTranslation();
   const { isAuthenticated, sessionChecked } = useUser();
   const navigate = useNavigate();
   const copy = getFriendlyCopy(i18n.language);
+  const hostRuntime = getHostRuntime();
+  const billingCta = hostRuntime.platform === 'apps-in-toss'
+    ? copy.login.secondaryCtaAppsInToss
+    : copy.login.secondaryCta;
 
   useEffect(() => {
     if (sessionChecked && isAuthenticated) {
@@ -53,7 +58,7 @@ export default function ScreenLogin() {
             onClick={() => navigate('/billing')}
           >
             <CreditCard className="h-4 w-4" />
-            <span>{copy.login.secondaryCta}</span>
+            <span>{billingCta}</span>
           </Button>
         </div>
 

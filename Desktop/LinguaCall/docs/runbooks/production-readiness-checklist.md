@@ -73,29 +73,31 @@ Twilio가 Supabase에 연결된 뒤 진행한다.
 
 ## 3. 결제 검증
 
-### 3.1 샌드박스
+### 3.1 Apps in Toss 샌드박스
 
-- `/#/billing` 접속
-- 현재 플랜 상태 확인
-- Toss 샌드박스 결제 시작
-- 결제 완료
-- 앱 복귀
-- 구독 상태 업데이트 확인
+- 일반 웹에서 `/#/billing` 접속
+- 현재 플랜 상태와 Apps in Toss 안내 문구 확인
+- 웹에서 유료 CTA가 비활성인지 확인
+- Apps in Toss 호스트에서 `/#/billing` 재진입
+- `POST /billing/apps-in-toss/payment-launch` 호출 확인
+- 샌드박스 결제 완료
+- webhook 반영 후 구독 상태 업데이트 확인
 - 새로고침 후 상태 유지 확인
 
 ### 3.2 실패 시나리오
 
-- 결제 취소
-- UI가 정상 복구되는지 확인
-- 중단되거나 잘못된 결제 경로 시도
+- Apps in Toss에서 결제 취소
+- launch 준비 API 실패
+- host hint는 있으나 bridge가 없는 상태
+- legacy success/cancel 복귀 링크 유입
 - 깨진 구독 상태가 생기지 않는지 확인
 
 통과 기준:
 
-- checkout 시작 성공
-- confirm 성공
-- 상태가 새로고침 후에도 유지
-- 실패 결제가 상태를 망치지 않음
+- 일반 웹에서 직접 checkout/confirm 경로가 보이지 않음
+- Apps in Toss에서 payment launch 준비가 성공함
+- webhook 반영 후 상태가 새로고침 후에도 유지됨
+- 실패/unsupported/legacy 상태마다 다음 행동이 분명함
 
 ## 4. 세션 생명주기 검증
 
@@ -277,7 +279,7 @@ curl -i -X POST "https://API_DOMAIN/workers/run" -H "x-worker-token: YOUR_WORKER
 아래 중 하나라도 남아 있으면 launch-ready로 보지 않는다.
 
 - 실제 SMS 도착이 불안정
-- 결제 confirm 불안정
+- Apps in Toss launch 또는 webhook 반영이 불안정
 - 라이브 세션 시작 또는 종료가 자주 깨짐
 - 리포트가 장시간 pending
 - 로그아웃 또는 세션 복구가 깨짐

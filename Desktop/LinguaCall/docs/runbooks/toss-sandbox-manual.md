@@ -1,108 +1,117 @@
 # Toss Sandbox 검증 매뉴얼
 
-이 문서는 **배포된 웹·API**에서 Toss **샌드박스** 결제 흐름을 검증할 때 쓰는 **보조 런북**입니다.
+이 문서는 **배포된 web·api**에서 현재 LinguaCall의 **Apps in Toss 전용 결제 진입**을 검증할 때 쓰는 보조 런북입니다.
 
-**메인 순서**는 [launch-e2e-checklist.md](./launch-e2e-checklist.md) **§3 Toss Sandbox 결제 E2E**입니다.
+메인 순서는 [launch-e2e-checklist.md](./launch-e2e-checklist.md) **§3 결제 E2E**를 따릅니다.
 
 ---
 
 ## 범위
 
-- 빌링 페이지가 Toss SDK로 결제창을 띄우는지 (`VITE_TOSS_CLIENT_KEY`)
-- 샌드박스 결제 후 앱으로 복귀하는지
-- 복귀 후 `POST /billing/toss/confirm`이 호출되는지
-- `GET /billing/subscription`·DB에 구독·플랜이 반영되는지
+포함:
 
-관련 프론트 코드 흐름:
+- 일반 웹 브라우저에서 `/#/billing`이 **안내/상태 확인 전용**으로 보이는지
+- Apps in Toss 호스트에서 `POST /billing/apps-in-toss/payment-launch`가 호출되는지
+- 인앱 결제 완료 후 Toss webhook으로 구독 상태가 갱신되는지
+- legacy success/cancel 복귀 링크가 더 이상 primary checkout처럼 보이지 않는지
+- host hint는 있으나 bridge가 없는 환경에서 복구 안내가 명확한지
 
-- `POST /billing/checkout` — 서버가 `orderId`, `amount`, `successUrl`, `customerKey` 등 반환
-- 토스 SDK `requestPayment` — `successUrl` / `failUrl`로 이동
-- 복귀 URL에 `checkout=success`이면 `readTossRedirectParams`로 `paymentKey`, `orderId`, `amount`를 읽어 `POST /billing/toss/confirm`
+제외:
 
-**Hash 라우터:** 앱 URL은 `https://APP_DOMAIN/#/billing?...` 형태입니다. 토스가 리다이렉트한 뒤 **주소줄 전체**에 `paymentKey`, `orderId`, `amount`가 어디에 붙었는지(쿼리 vs 해시) 개발자도구에서 한 번 확인하면 디버깅에 도움이 됩니다. `readTossRedirectParams`는 `new URL(currentUrl).searchParams`를 사용하므로, 이 값들이 **URL의 query 문자열** 쪽에 있어야 파싱됩니다. confirm이 자동으로 안 되면 주소 형태를 먼저 의심합니다.
+- 일반 브라우저의 Toss SDK popup/redirect checkout
+- `POST /billing/toss/confirm` 브라우저 복귀 confirm 플로우
+
+현재 코드 기준 참고:
+
+- web checkout 시작: `POST /billing/checkout` → **403 forbidden**
+- web confirm: `POST /billing/toss/confirm` → **403 forbidden**
+- Apps in Toss host 검증: `POST /billing/apps-in-toss/verify-session`
+- in-app payment launch 준비: `POST /billing/apps-in-toss/payment-launch`
+- 결제 완료 반영: `POST /billing/webhooks/toss`
 
 ---
 
 ## 사전 준비
 
-- `https://APP_DOMAIN`, `https://API_DOMAIN` 모두 TLS 정상.
+- `https://APP_DOMAIN`, `https://API_DOMAIN` 모두 TLS 정상
+- Apps in Toss 진입 경로 또는 호스트 QA 환경 준비
 - `infra/.env.production`:
-  - **API**: `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY` → **샌드박스(테스트) 키** (`test_ck_...`, `test_sk_...`)
-  - **웹 빌드 시 주입**: `VITE_TOSS_CLIENT_KEY` → **클라이언트용 테스트 키** (보통 `TOSS_CLIENT_KEY`와 동일 계열)
-- **웹 이미지 재빌드**: `VITE_*`를 바꾼 뒤에는 `docker compose ... build web` (또는 전체 build) 필요.
-- [launch-e2e-checklist.md](./launch-e2e-checklist.md) **§2**까지 완료 — 빌링 API는 인증 필요.
-- DB `plans` 테이블에 **활성 유료 플랜**이 1개 이상. 마이그레이션만 돌고 seed가 없으면 수동 INSERT 필요:
+  - API: `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY` → 샌드박스 키
+  - web: Apps in Toss host에서 로드 가능한 최신 번들 배포 완료
+- [launch-e2e-checklist.md](./launch-e2e-checklist.md) §2까지 완료
+- DB `plans` 테이블에 활성 유료 플랜이 1개 이상 존재
 
 ```sql
-select code, display_name, price_krw, active from plans where active = true;
+select code, display_name, price_krw, active
+from plans
+where active = true;
 ```
-
-행이 없거나 유료(`price_krw > 0`)가 없으면 `checkout`이 실패할 수 있습니다. `code` 값(예: `basic`, `pro`)이 UI·API와 맞는지 확인합니다.
 
 ---
 
-## 1. 사전 점검
+## 1. 일반 웹 브라우저 모드 확인
 
-### 1.1 API 헬스
-
-```bash
-curl -sS "https://${API_DOMAIN}/healthz"
-```
-
-### 1.2 브라우저 (로그인 상태)
-
-1. `https://APP_DOMAIN/#/billing` 열기.
-2. DevTools → **Network** → 필터 `billing`.
-3. 아래가 **200**인지 확인:
-   - `GET .../billing/plans`
-   - `GET .../billing/subscription`
-
-401이면 쿠키 세션이 없는 것 — OTP 인증부터 다시 합니다.
-
----
-
-## 2. Checkout 시작
-
-1. `/#/billing`에서 유료 플랜 카드의 **업그레이드/결제** 버튼 클릭.
+1. `https://APP_DOMAIN/#/billing` 열기
+2. DevTools → Network → `billing` 필터
+3. 아래 요청이 200인지 확인
+   - `GET /billing/plans`
+   - `GET /billing/subscription`
+4. 유료 플랜 CTA가 비활성인지 확인
+5. `Apps in Toss 안에서만 진행` 계열 안내 문구 확인
 
 ### 기대 결과
 
-- `POST /billing/checkout` — 200, 본문 `ok: true`, `data`에 대략:
-  - `provider: "toss"`
-  - `orderId`, `orderName`, `amount`
-  - `successUrl`, `failUrl`
+- 일반 웹에서는 `POST /billing/apps-in-toss/payment-launch`가 발생하지 않음
+- `POST /billing/checkout` / `POST /billing/toss/confirm`도 발생하지 않음
+- dead CTA 없이 Apps in Toss 진입 필요성이 명확히 보임
+
+---
+
+## 2. Apps in Toss 호스트 모드 확인
+
+1. Apps in Toss 내부 진입 경로로 `/#/billing` 열기
+2. 상단 ready notice 확인
+3. DevTools 또는 네트워크 프록시에서 아래 흐름 확인
+4. 유료 플랜 CTA 클릭
+
+### 기대 결과
+
+- `POST /billing/apps-in-toss/verify-session` → 200
+- `POST /billing/apps-in-toss/payment-launch` → 200
+- 응답 `data`에 대략 아래 필드 포함
+  - `provider`
+  - `planCode`
+  - `orderId`
+  - `orderName`
+  - `amount`
+  - `successUrl`
+  - `failUrl`
   - `customerKey`
-- 이어서 Toss 결제창(위젯) 로드.
+- 이후 Apps in Toss bridge가 인앱 결제 화면으로 handoff
 
-### 결제창이 안 뜰 때
+### launch 준비 API 실패 시
 
-- 브라우저 **콘솔** 에러 (SDK 로드 실패, 키 누락 등).
-- `VITE_TOSS_CLIENT_KEY` 빈 문자열이면 프론트에서 `toss client key is not configured` 류 에러.
-- 배포된 번들에 옛 키가 박혀 있지 않은지 — **web 이미지 재빌드** 여부.
-
-### checkout API가 실패할 때
-
-- Network에서 응답 JSON의 `error.message` 확인.
-- API 로그, `plans` 테이블, 현재 사용자 상태(이미 구독 중인지 등).
+- 응답 JSON의 `error.message` 확인
+- API 로그 확인
+- `plans` 테이블, 사용자 현재 구독 상태 점검
 
 ---
 
 ## 3. Sandbox 결제 진행
 
-1. Toss **개발자 문서**에 안내된 **샌드박스 테스트 카드·결제수단**으로 승인합니다.  
-   공식 문서: [Toss Payments 문서](https://docs.tosspayments.com/)에서 “샌드박스”·“테스트” 키워드로 최신 수단을 확인하세요 (카드 번호는 문서가 바뀔 수 있음).
-2. 결제 완료까지 진행.
-3. 브라우저가 앱의 빌링 URL로 돌아오는지 확인.
+1. Toss 개발자 문서의 최신 샌드박스 수단으로 승인
+2. 결제 완료까지 진행
+3. 앱이 다시 billing surface로 돌아오거나 구독 상태를 새로고침할 수 있는지 확인
 
 ### 기대 결과
 
-- 주소에 `checkout=success` 등이 포함된 `#/billing?...` 상태.
-- URL의 **query** 쪽에 토스가 넘겨준 `paymentKey`, `orderId`, `amount`가 잡히면, 프론트가 자동으로 `POST /billing/toss/confirm`을 호출합니다.
-- UI에 잠시 `confirming payment...` 같은 표시가 나올 수 있음.
+- primary 성공 경로는 webhook 반영 기준
+- 브라우저 confirm 호출 없이도 구독 상태가 갱신됨
+- billing 화면의 현재 플랜/상태가 새로고침 후 일치함
 
-### cancel 흐름
+### 참고
 
-- 사용자가 취소하면 `checkout=cancel` 쪽으로 돌아옵니다. 이때는 confirm 호출이 없어도 정상입니다.
+legacy `checkout=success|cancel` URL이 열릴 수는 있지만, 이는 compatibility notice를 보여주는 보조 경로로만 남아 있어야 합니다.
 
 ---
 
@@ -110,17 +119,22 @@ curl -sS "https://${API_DOMAIN}/healthz"
 
 ### 4.1 Network
 
-- `POST /billing/toss/confirm` — **200**, 본문 `ok: true`.
-- 이어지는 `GET /billing/subscription` — 플랜·상태 갱신.
+- `POST /billing/apps-in-toss/verify-session` — 200
+- `POST /billing/apps-in-toss/payment-launch` — 200
+- `POST /billing/webhooks/toss` — provider 측 성공 반영
+- `GET /billing/subscription` — 갱신된 플랜/상태 확인
 
 ### 4.2 UI
 
-- 에러 배너가 남지 않음.
-- “현재 구독” 또는 동등 영역에 유료 플랜 표시.
+- Apps in Toss host에서는 CTA가 활성화됨
+- 일반 웹에서는 CTA가 비활성 + 안내 문구 표시
+- 에러/unsupported 상태에서 다음 행동이 문구로 명확함
 
-### 4.3 응답 저장 (증적)
+### 4.3 응답 저장
 
-- `POST /billing/toss/confirm`의 응답 JSON을 복사해 두면 출시 검토에 유리합니다 (민감 필드는 마스킹).
+- `POST /billing/apps-in-toss/payment-launch` 응답 JSON
+- webhook 성공 증적 또는 최신 subscription 조회 결과
+- 구독 반영 후 billing 화면 캡처
 
 ---
 
@@ -135,22 +149,16 @@ order by updated_at desc
 limit 10;
 ```
 
-**기대:** `provider`가 toss 계열, `status`가 `active` 등 기대 상태.
-
 ### 5.2 사용자 플랜·잔여 분
 
 ```sql
-select id, clerk_user_id, plan_code, paid_minutes_balance, updated_at
+select id, plan_code, paid_minutes_balance, updated_at
 from users
 order by updated_at desc
 limit 10;
 ```
 
-**기대:** 테스트 계정의 `plan_code`가 유료 플랜 코드로 갱신(구현에 따라 `paid_minutes_balance` 등도 변동).
-
 ### 5.3 크레딧 원장
-
-앱이 `credit_ledger`를 쓰는 경우(스키마는 마이그레이션 기준):
 
 ```sql
 select user_id, unit_type, entry_kind, delta, reason, created_at
@@ -159,44 +167,47 @@ order by created_at desc
 limit 20;
 ```
 
-allowance·구독 연동 로직이 있으면 관련 `reason`·`delta` 행이 생길 수 있습니다.
-
 ---
 
 ## 6. 실패 시 분기
 
-### Checkout 요청 실패 (`POST /billing/checkout`)
+### 일반 웹에서 결제 진입을 시도하고 싶어지는 경우
 
-- 응답 본문·API 로그.
-- `plans`에 유효한 유료 플랜·`active = true`.
-- 사용자가 이미 활성 구독을 가진 경우 비즈니스 규칙상 거절될 수 있음.
+- 기대 동작은 차단이다
+- `/#/billing`은 비교/상태 확인용이고 Apps in Toss 진입을 안내해야 한다
 
-### 결제창은 떴는데 confirm 실패
+### host hint는 있지만 bridge가 없는 경우
 
-- `TOSS_SECRET_KEY`가 **test_sk**와 짝이 맞는지 (라이브 키 혼입 여부).
-- 복귀 URL에 `paymentKey`, `orderId`, `amount` 누락 여부 — **Hash만 바뀌고 search가 비어 있는 경우** 프론트 파싱 실패 가능.
-- `POST /billing/toss/confirm` 응답 JSON·API 로그.
+- `hostUnavailableNotice` 계열 문구가 보여야 함
+- 사용자는 최신 Apps in Toss 진입 경로에서 다시 열어야 함
 
-### Confirm은 200인데 subscription이 안 바뀜
+### launch 준비 API는 성공했지만 상태가 안 바뀌는 경우
 
-- `subscriptions` / `users.plan_code` 직접 조회.
-- 웹훅을 쓰는 배포라면 `webhook_events`·서명 시크릿(`BILLING_WEBHOOK_SECRET*` )도 점검 (이 저장소 빌링 라우트 구현 기준).
+- webhook 반영 여부 확인
+- `subscriptions`, `users.plan_code` 직접 조회
+- webhook 서명 설정(`BILLING_WEBHOOK_SECRET*`) 점검
+
+### legacy success/cancel 복귀가 열리는 경우
+
+- success/cancel별 notice만 보이고 primary 결제 경로처럼 보이지 않아야 함
+- 사용자를 다시 Apps in Toss billing으로 유도해야 함
 
 ---
 
 ## 7. 운영 전환 시 알림
 
-- 샌드박스에서 **여러 번** 성공한 뒤에만 `TOSS_CLIENT_KEY` / `TOSS_SECRET_KEY` / `VITE_TOSS_CLIENT_KEY`를 **라이브 키**로 교체합니다.
-- 키를 바꾼 뒤에는 반드시 **API 재시작 + web 재빌드**를 합니다.
+- 샌드박스에서 여러 번 성공한 뒤 `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`를 live 값으로 교체
+- 키 변경 후 API 재시작과 최신 web 번들 반영 필요
+- live 전환 뒤에는 Apps in Toss 내부에서 소액 실결제 1건으로 launch → webhook → 구독 반영까지 다시 확인
 
 ---
 
 ## 8. 남겨야 할 증적
 
-- 결제 전 `/#/billing` 화면
-- Toss 샌드박스 결제 완료 화면
-- 복귀 후 빌링 화면(구독 반영)
-- `POST /billing/toss/confirm` 네트워크 응답
-- (선택) `subscriptions` 최신 행 쿼리 결과
+- 일반 웹 `/#/billing` 화면
+- Apps in Toss host `/#/billing` 화면
+- `POST /billing/apps-in-toss/payment-launch` 응답
+- webhook 반영 후 billing 화면 또는 subscription 조회 결과
+- legacy success/cancel notice 화면 (해당 시)
 
-[launch-e2e-checklist.md](./launch-e2e-checklist.md) §8과 함께 보관합니다.
+[launch-e2e-checklist.md](./launch-e2e-checklist.md)와 함께 보관합니다.

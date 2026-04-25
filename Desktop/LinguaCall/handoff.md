@@ -1,6 +1,6 @@
 # LinguaCall Handoff
 
-Last updated: 2026-04-08
+Last updated: 2026-04-25
 
 ## Current state
 
@@ -14,7 +14,15 @@ Production stack is running on a VPS with Docker Compose.
 
 ## What is deployed
 
-Commit: `8cb7969` (style: align UI visual tone to DESIGN.md)
+Commit: `5f73fef` (billing return handling hardening)
+
+Latest production changes:
+- billing success/cancel/return copy polished for launch
+- web billing now stays informational while Apps in Toss is the primary payment entry path
+- browser-side checkout/confirm is no longer the primary release flow
+- Supabase migrations applied:
+  - `20260424_pending_billing_checkouts.sql`
+  - `20260425_pending_billing_checkout_claim.sql`
 
 All Phase 1–6 UX features are in production:
 
@@ -39,7 +47,7 @@ Browser
 
 api / worker → Supabase Postgres
 web → Supabase Auth (phone OTP)
-web → Toss Payments (checkout widget)
+web → Apps in Toss payment launch + Toss webhook sync
 web → OpenAI Realtime (WebRTC, PTT mode)
 ```
 
@@ -81,6 +89,9 @@ docker compose --env-file infra/.env.production -f infra/docker-compose.yml up -
 ## Next work
 
 - Phase 2: stage/situation 선택 UI (준비/모의/실전 + 언어별 프리셋)
+- `/billing/apps-in-toss/payment-launch`는 최근 `/billing/apps-in-toss/verify-session` 성공 이력이 있어야만 열림. 현재 구현은 `appLogin`으로 받은 `authorizationCode`/`referrer`를 서버에서 교환해 짧은 TTL 세션으로 검증함
+- Apps in Toss 운영 전환 시 `APPS_IN_TOSS_PARTNER_API_KEY`, `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `VITE_TOSS_CLIENT_KEY`를 모두 live 값으로 교체 후 `web`/`api` 재빌드
+- 운영 키 전환 후 Apps in Toss 내부에서 소액 실결제 1건으로 launch → webhook → 구독 반영까지 다시 확인
 
 ## Archival
 

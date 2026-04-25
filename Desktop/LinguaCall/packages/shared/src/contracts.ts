@@ -14,7 +14,8 @@ export type ApiErrorCode =
   | "forbidden"
   | "rate_limited"
   | "insufficient_allowance"
-  | "invalid_duration_for_plan";
+  | "invalid_duration_for_plan"
+  | "apps_in_toss_verification_required";
 
 export interface ApiError {
   code: ApiErrorCode;
@@ -305,6 +306,19 @@ export interface BillingCheckoutSession {
   successUrl?: string;
   failUrl?: string;
   customerKey?: string;
+  customerEmail?: string;
+  customerName?: string;
+}
+
+export interface AppsInTossPaymentLaunchSession {
+  provider: string;
+  planCode: string;
+  orderId: string;
+  orderName: string;
+  amount: number;
+  successUrl: string;
+  failUrl: string;
+  customerKey: string;
   customerEmail?: string;
   customerName?: string;
 }

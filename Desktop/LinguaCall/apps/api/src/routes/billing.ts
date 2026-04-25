@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { Request, Response, Router } from "express";
 import {
   ApiResponse,
+  AppsInTossPaymentLaunchSession,
   BillingCheckoutSession,
   BillingPlan,
   BillingWebhookPayload,
@@ -11,13 +12,146 @@ import {
 import { AppError } from "../storage/inMemoryStore";
 import { requireAuthenticatedUser, AuthenticatedRequest } from "../middleware/auth";
 import { billingRepository } from "../modules/billing/repository";
-import { assertTossOnlyProvider, normalizeTossProvider, TOSS_PROVIDER } from "../modules/billing/tossService";
+import { TOSS_PROVIDER } from "../modules/billing/tossService";
 
 const router = Router();
 
 type WebhookBody = Record<string, unknown>;
 type WebhookObject = Record<string, unknown>;
 type BillingWebhookRequest = Request & { rawBody?: string };
+type AppsInTossVerificationEntry = {
+  expiresAt: number;
+  userKey: string;
+};
+type AppsInTossVerifySessionPayload = {
+  authorizationCode: string;
+  referrer: string;
+};
+type AppsInTossGenerateTokenResponse = {
+  accessToken?: string;
+  access_token?: string;
+};
+type AppsInTossLoginMeResponse = {
+  userKey?: string;
+  user_key?: string;
+};
+
+const APPS_IN_TOSS_OAUTH_BASE_URL = "https://apps-in-toss-api.toss.im/api-partner/v1/apps-in-toss/user/oauth2";
+const APPS_IN_TOSS_VERIFICATION_TTL_MS = 5 * 60 * 1000;
+const appsInTossVerifiedSessions = new Map<string, AppsInTossVerificationEntry>();
+
+const readTrustedBillingOrigins = (): string[] => {
+  const values = [
+    process.env.ALLOWED_ORIGINS,
+    process.env.APP_BASE_URL,
+    process.env.PUBLIC_BASE_URL
+  ]
+    .flatMap((value) => (value ?? "").split(","))
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+
+  return [...new Set(values.map((value) => {
+    try {
+      return new URL(value).origin;
+    } catch {
+      return "";
+    }
+  }).filter((value) => value.length > 0))];
+};
+
+const assertTrustedBillingCallbackUrl = (value: unknown): string | undefined => {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new AppError("validation_error", "untrusted billing callback url");
+  }
+
+  const trustedOrigins = readTrustedBillingOrigins();
+  if (trustedOrigins.length === 0 || !trustedOrigins.includes(parsed.origin)) {
+    throw new AppError("validation_error", "untrusted billing callback url");
+  }
+
+  return trimmed;
+};
+
+const readAppsInTossPartnerApiKey = (): string | undefined => {
+  return process.env.APPS_IN_TOSS_PARTNER_API_KEY?.trim()
+    || process.env.APPS_IN_TOSS_API_KEY?.trim()
+    || process.env.TOSS_APPS_API_KEY?.trim()
+    || undefined;
+};
+
+const readAppsInTossVerification = (clerkUserId: string): AppsInTossVerificationEntry | null => {
+  const entry = appsInTossVerifiedSessions.get(clerkUserId);
+  if (!entry) {
+    return null;
+  }
+  if (entry.expiresAt <= Date.now()) {
+    appsInTossVerifiedSessions.delete(clerkUserId);
+    return null;
+  }
+  return entry;
+};
+
+const markAppsInTossVerified = (clerkUserId: string, userKey: string): void => {
+  appsInTossVerifiedSessions.set(clerkUserId, {
+    userKey,
+    expiresAt: Date.now() + APPS_IN_TOSS_VERIFICATION_TTL_MS
+  });
+};
+
+const requestAppsInTossAccessToken = async (
+  payload: AppsInTossVerifySessionPayload
+): Promise<string> => {
+  const partnerApiKey = readAppsInTossPartnerApiKey();
+  const response = await fetch(`${APPS_IN_TOSS_OAUTH_BASE_URL}/generate-token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(partnerApiKey ? { Authorization: `Bearer ${partnerApiKey}` } : {})
+    },
+    body: JSON.stringify({
+      authorizationCode: payload.authorizationCode,
+      referrer: payload.referrer
+    })
+  });
+  if (!response.ok) {
+    throw new Error("failed_to_verify_apps_in_toss_session");
+  }
+  const body = await response.json() as AppsInTossGenerateTokenResponse;
+  const accessToken = body.accessToken ?? body.access_token;
+  if (typeof accessToken !== "string" || accessToken.trim().length === 0) {
+    throw new Error("failed_to_verify_apps_in_toss_session");
+  }
+  return accessToken;
+};
+
+const requestAppsInTossUserKey = async (accessToken: string): Promise<string> => {
+  const response = await fetch(`${APPS_IN_TOSS_OAUTH_BASE_URL}/login-me`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    }
+  });
+  if (!response.ok) {
+    throw new Error("failed_to_verify_apps_in_toss_session");
+  }
+  const body = await response.json() as AppsInTossLoginMeResponse;
+  const userKey = body.userKey ?? body.user_key;
+  if (typeof userKey !== "string" || userKey.trim().length === 0) {
+    throw new Error("failed_to_verify_apps_in_toss_session");
+  }
+  return userKey;
+};
 
 const pickFirstString = (...values: Array<unknown>): string | undefined => {
   return values.find((entry) => {
@@ -99,29 +233,6 @@ const verifyBillingWebhookSignatureWithProvider = (
   const expectedHex = createHmac("sha256", secret).update(payloadText).digest("hex");
   const expectedBase64 = createHmac("sha256", secret).update(payloadText).digest("base64");
   return equalSignature(signature, expectedHex) || equalSignature(signature, expectedBase64);
-};
-
-const ALLOWED_REDIRECT_ORIGINS: readonly string[] = Object.freeze(
-  [
-    ...(process.env.ALLOWED_ORIGINS?.split(",") ?? []),
-    process.env.APP_BASE_URL ?? "",
-    process.env.API_BASE_URL ?? ""
-  ]
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0)
-);
-
-const sanitizeRedirectUrl = (raw: unknown): string | undefined => {
-  if (typeof raw !== "string" || !raw.trim()) {
-    return undefined;
-  }
-
-  try {
-    const parsed = new URL(raw);
-    return ALLOWED_REDIRECT_ORIGINS.includes(parsed.origin) ? parsed.toString() : undefined;
-  } catch {
-    return undefined;
-  }
 };
 
 const readWebhookStatus = (body: WebhookBody, eventType: string | undefined): string | undefined => {
@@ -425,40 +536,147 @@ router.get(
   }
 );
 
-const handleCheckoutSession = async (
+const toAppsInTossPaymentLaunchSession = (
+  checkout: BillingCheckoutSession
+): AppsInTossPaymentLaunchSession => {
+  if (!checkout.orderId || !checkout.orderName || typeof checkout.amount !== "number" || !checkout.successUrl || !checkout.failUrl || !checkout.customerKey) {
+    throw new AppError("validation_error", "failed_to_prepare_apps_in_toss_payment_launch");
+  }
+
+  return {
+    provider: checkout.provider,
+    planCode: checkout.planCode,
+    orderId: checkout.orderId,
+    orderName: checkout.orderName,
+    amount: checkout.amount,
+    successUrl: checkout.successUrl,
+    failUrl: checkout.failUrl,
+    customerKey: checkout.customerKey,
+    customerEmail: checkout.customerEmail,
+    customerName: checkout.customerName
+  };
+};
+
+const sanitizeCheckoutPayload = (
+  payload: CreateCheckoutSessionPayload
+): CreateCheckoutSessionPayload => {
+  const returnUrl = assertTrustedBillingCallbackUrl(payload.returnUrl);
+  const cancelUrl = assertTrustedBillingCallbackUrl(payload.cancelUrl);
+
+  return {
+    ...payload,
+    ...(returnUrl ? { returnUrl } : {}),
+    ...(cancelUrl ? { cancelUrl } : {})
+  };
+};
+
+const handleAppsInTossVerifySession = async (
   req: AuthenticatedRequest,
-  res: Response<ApiResponse<BillingCheckoutSession>>
+  res: Response<ApiResponse<{ verified: true }>>
 ) => {
-  const payload = req.body as Partial<CreateCheckoutSessionPayload>;
-  if (!payload || typeof payload.planCode !== "string" || !payload.planCode.trim()) {
-    res.status(422).json({ ok: false, error: { code: "validation_error", message: "planCode is required" } });
+  if (!req.body || typeof req.body !== "object") {
+    res.status(422).json({
+      ok: false,
+      error: { code: "validation_error", message: "invalid Apps in Toss verification payload" }
+    });
+    return;
+  }
+
+  const requestBody = req.body as Record<string, unknown>;
+  const rawAuthorizationCode = requestBody.authorizationCode;
+  const rawReferrer = requestBody.referrer;
+  const authorizationCode = typeof rawAuthorizationCode === "string"
+    ? rawAuthorizationCode.trim()
+    : "";
+  const referrer = typeof rawReferrer === "string"
+    ? rawReferrer.trim()
+    : "";
+
+  if (!authorizationCode || !referrer) {
+    res.status(422).json({
+      ok: false,
+      error: { code: "validation_error", message: "authorizationCode and referrer are required" }
+    });
     return;
   }
 
   try {
-    assertTossOnlyProvider(typeof payload.provider === "string" ? payload.provider : undefined);
-    const checkout = await billingRepository.createCheckoutSession(req.clerkUserId, {
-      planCode: payload.planCode,
-      returnUrl: sanitizeRedirectUrl(payload.returnUrl),
-      cancelUrl: sanitizeRedirectUrl(payload.cancelUrl),
-      provider: normalizeTossProvider()
-    });
-    res.status(200).json({ ok: true, data: checkout });
+    const accessToken = await requestAppsInTossAccessToken({ authorizationCode, referrer });
+    const userKey = await requestAppsInTossUserKey(accessToken);
+    markAppsInTossVerified(req.clerkUserId, userKey);
+    res.status(200).json({ ok: true, data: { verified: true } });
   } catch (error) {
-    if (error instanceof AppError && error.code === "validation_error") {
-      res.status(422).json({
-        ok: false,
-        error: { code: "validation_error", message: error.message }
-      });
+    if (error instanceof AppError && error.code === "forbidden") {
+      res.status(403).json({ ok: false, error: { code: "forbidden", message: error.message } });
       return;
     }
-    res.status(500).json({
+    res.status(403).json({
       ok: false,
-      error: { code: "validation_error", message: "failed_to_create_checkout_session" }
+      error: { code: "forbidden", message: "failed_to_verify_apps_in_toss_session" }
     });
   }
 };
 
+const handleAppsInTossPaymentLaunch = async (
+  req: AuthenticatedRequest,
+  res: Response<ApiResponse<AppsInTossPaymentLaunchSession>>
+) => {
+  if (!req.body || typeof req.body !== "object") {
+    res.status(422).json({
+      ok: false,
+      error: { code: "validation_error", message: "invalid payment launch payload" }
+    });
+    return;
+  }
+
+  if (!readAppsInTossVerification(req.clerkUserId)) {
+    res.status(403).json({
+      ok: false,
+      error: {
+        code: "apps_in_toss_verification_required",
+        message: "Apps in Toss verification required before payment launch"
+      }
+    });
+    return;
+  }
+
+  try {
+    const checkout = await billingRepository.createCheckoutSession(
+      req.clerkUserId,
+      sanitizeCheckoutPayload(req.body as CreateCheckoutSessionPayload)
+    );
+    res.status(200).json({ ok: true, data: toAppsInTossPaymentLaunchSession(checkout) });
+  } catch (error) {
+    if (error instanceof AppError && error.code === "validation_error") {
+      res.status(422).json({ ok: false, error: { code: "validation_error", message: error.message } });
+      return;
+    }
+    if (error instanceof AppError && error.code === "not_found") {
+      res.status(404).json({ ok: false, error: { code: "not_found", message: error.message } });
+      return;
+    }
+    res.status(400).json({
+      ok: false,
+      error: { code: "validation_error", message: "failed_to_prepare_apps_in_toss_payment_launch" }
+    });
+  }
+};
+
+const handleCheckoutSession = async (
+  _req: AuthenticatedRequest,
+  res: Response<ApiResponse<BillingCheckoutSession>>
+) => {
+  res.status(403).json({
+    ok: false,
+    error: {
+      code: "forbidden",
+      message: "web checkout is disabled; complete payment inside Apps in Toss"
+    }
+  });
+};
+
+router.post("/apps-in-toss/verify-session", requireAuthenticatedUser, handleAppsInTossVerifySession);
+router.post("/apps-in-toss/payment-launch", requireAuthenticatedUser, handleAppsInTossPaymentLaunch);
 router.post("/checkout", requireAuthenticatedUser, handleCheckoutSession);
 router.post("/checkout-sessions", requireAuthenticatedUser, handleCheckoutSession);
 
@@ -466,125 +684,14 @@ router.post("/checkout-sessions", requireAuthenticatedUser, handleCheckoutSessio
 router.post(
   "/toss/confirm",
   requireAuthenticatedUser,
-  async (req: AuthenticatedRequest, res: Response<ApiResponse<UserSubscription>>) => {
-    const { paymentKey, orderId, amount } = req.body as {
-      paymentKey?: string;
-      orderId?: string;
-      amount?: number;
-    };
-
-    if (!paymentKey || !orderId || amount == null) {
-      res.status(422).json({
-        ok: false,
-        error: { code: "validation_error", message: "paymentKey, orderId, and amount are required" }
-      });
-      return;
-    }
-
-    const pendingCheckout = await billingRepository.getPendingCheckoutByOrderId(orderId);
-    if (!pendingCheckout) {
-      res.status(422).json({
-        ok: false,
-        error: { code: "not_found", message: "checkout session not found" }
-      });
-      return;
-    }
-    if (pendingCheckout.clerkUserId !== req.clerkUserId) {
-      res.status(422).json({
-        ok: false,
-        error: { code: "conflict", message: "checkout session belongs to another user" }
-      });
-      return;
-    }
-    if (pendingCheckout.amount !== amount) {
-      res.status(422).json({
-        ok: false,
-        error: { code: "validation_error", message: "checkout amount does not match" }
-      });
-      return;
-    }
-
-    const claimedCheckout = await billingRepository.claimPendingCheckout(orderId);
-    if (!claimedCheckout) {
-      res.status(409).json({
-        ok: false,
-        error: { code: "conflict", message: "checkout confirmation already in progress" }
-      });
-      return;
-    }
-
-    const tossSecretKey = process.env.TOSS_SECRET_KEY;
-    if (!tossSecretKey) {
-      await billingRepository.releasePendingCheckout(orderId, claimedCheckout.confirmationToken);
-      res.status(500).json({
-        ok: false,
-        error: { code: "validation_error", message: "toss payments not configured" }
-      });
-      return;
-    }
-
-    const basicAuth = Buffer.from(`${tossSecretKey}:`).toString("base64");
-    let tossHttpResponse: globalThis.Response;
-    try {
-      tossHttpResponse = await fetch("https://api.tosspayments.com/v1/payments/confirm", {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${basicAuth}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ paymentKey, orderId, amount })
-      });
-    } catch {
-      await billingRepository.releasePendingCheckout(orderId, claimedCheckout.confirmationToken);
-      res.status(502).json({
-        ok: false,
-        error: { code: "validation_error", message: "failed to reach toss payments api" }
-      });
-      return;
-    }
-
-    if (!tossHttpResponse.ok) {
-      await billingRepository.releasePendingCheckout(orderId, claimedCheckout.confirmationToken);
-      const tossError = (await tossHttpResponse.json().catch(() => ({}))) as Record<string, unknown>;
-      res.status(402).json({
-        ok: false,
-        error: {
-          code: "validation_error",
-          message: (tossError.message as string) ?? "toss payment confirmation failed"
-        }
-      });
-      return;
-    }
-
-    const tossData = (await tossHttpResponse.json()) as Record<string, unknown>;
-    const metadata = tossData.metadata as Record<string, unknown> | undefined;
-
-    try {
-      const subscription = await billingRepository.handleWebhook({
-        eventType: "payment.confirmed",
-        provider: TOSS_PROVIDER,
-        providerSubscriptionId: orderId,
-        clerkUserId: req.clerkUserId,
-        planCode: claimedCheckout.planCode,
-        status: "active",
-        metadata: { paymentKey, orderId, amount, ...metadata }
-      });
-      await billingRepository.completePendingCheckout(orderId, claimedCheckout.confirmationToken);
-      res.status(200).json({ ok: true, data: subscription });
-    } catch (error) {
-      await billingRepository.releasePendingCheckout(orderId, claimedCheckout.confirmationToken);
-      if (error instanceof AppError) {
-        const code = (error.code === "not_found" || error.code === "conflict" || error.code === "validation_error")
-          ? error.code
-          : "validation_error" as const;
-        res.status(422).json({ ok: false, error: { code, message: error.message } });
-        return;
+  async (_req: AuthenticatedRequest, res: Response<ApiResponse<UserSubscription>>) => {
+    res.status(403).json({
+      ok: false,
+      error: {
+        code: "forbidden",
+        message: "web payment confirmation is disabled; complete payment inside Apps in Toss"
       }
-      res.status(500).json({
-        ok: false,
-        error: { code: "validation_error", message: "failed_to_activate_subscription" }
-      });
-    }
+    });
   }
 );
 

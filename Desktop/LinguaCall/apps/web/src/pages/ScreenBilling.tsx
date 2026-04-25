@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import type { UserSubscription, BillingPlan, BillingCheckoutSession } from '@lingua/shared';
+import type { AppsInTossPaymentLaunchSession, UserSubscription, BillingPlan } from '@lingua/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -11,26 +11,38 @@ import { useUser } from '../context/UserContext';
 import { apiClient, describeApiError } from '../lib/api';
 import LanguagePicker from '../components/ui/LanguagePicker';
 import { getFriendlyCopy } from '../content/friendlyCopy';
-import { createCheckoutPayload, readBillingReturnState } from '../features/billing/checkout';
-import { startTossCheckout } from '../features/billing/toss';
+import { readBillingReturnState, startAppsInTossBillingLaunch } from '../features/billing/checkout';
+import { canLaunchAppsInTossPayment, HostBridgeError } from '../lib/hostBridge';
+import { getHostRuntime } from '../lib/hostRuntime';
 
 export default function ScreenBilling() {
   const { i18n, t } = useTranslation();
   const { getToken, refreshSession } = useUser();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
 
   const returnState = readBillingReturnState(window.location.href);
-  const { checkoutResult, checkoutPlan, tossRedirect, shouldConfirm } = returnState;
+  const { checkoutResult, hasLegacyReturn } = returnState;
   const copy = getFriendlyCopy(i18n.language);
+  const hostRuntime = getHostRuntime();
+  const appsInTossAvailable = canLaunchAppsInTossPayment(hostRuntime);
+  const hostNotice = appsInTossAvailable
+    ? copy.billing.appsInTossReadyNotice
+    : hostRuntime.platform === 'unknown' || hostRuntime.platform === 'apps-in-toss'
+      ? copy.billing.hostUnavailableNotice
+      : '';
+  const legacyNotice = hasLegacyReturn
+    ? checkoutResult === 'success'
+      ? copy.billing.legacyReturnSuccessNotice
+      : checkoutResult === 'cancel'
+        ? copy.billing.legacyReturnCancelNotice
+        : copy.billing.legacyReturnNotice
+    : '';
 
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [plans, setPlans] = useState<BillingPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
-  const [confirmingReturn, setConfirmingReturn] = useState(false);
-  const [confirmSuccess, setConfirmSuccess] = useState(false);
+  const [launchingPlanCode, setLaunchingPlanCode] = useState('');
 
   const load = useCallback(async () => {
     const api = apiClient(getToken, refreshSession);
@@ -55,66 +67,36 @@ export default function ScreenBilling() {
   }, [load]);
 
   useEffect(() => {
-    if (!checkoutResult) return;
-    if (shouldConfirm) return;
-    const next = new URLSearchParams(searchParams);
-    next.delete('checkout');
-    next.delete('provider');
-    next.delete('plan');
-    const timeout = window.setTimeout(() => {
-      setSearchParams(next, { replace: true });
-    }, 0);
-    return () => window.clearTimeout(timeout);
-  }, [checkoutResult, searchParams, setSearchParams, shouldConfirm]);
+    if (!hasLegacyReturn) return;
+    const cleanUrl = `${window.location.pathname}${window.location.hash.split('?')[0]}`;
+    window.history.replaceState({}, document.title, cleanUrl);
+  }, [hasLegacyReturn]);
 
-  useEffect(() => {
-    if (!shouldConfirm || !tossRedirect) return;
-
-    let cancelled = false;
-    const confirmReturn = async () => {
-      const api = apiClient(getToken, refreshSession);
-      setConfirmingReturn(true);
-      setError('');
-      try {
-        await api.post<UserSubscription>('/billing/toss/confirm', tossRedirect);
-        if (cancelled) return;
-        setConfirmSuccess(true);
-        await load();
-      } catch (err) {
-        if (cancelled) return;
-        setConfirmSuccess(false);
-        setError(describeApiError(err, 'billing_confirm'));
-      } finally {
-        if (!cancelled) {
-          setConfirmingReturn(false);
-          window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.hash.split('?')[0]}`);
-          const next = new URLSearchParams(searchParams);
-          next.delete('checkout');
-          next.delete('provider');
-          next.delete('plan');
-          setSearchParams(next, { replace: true });
-        }
-      }
-    };
-
-    void confirmReturn();
-    return () => {
-      cancelled = true;
-    };
-  }, [getToken, load, refreshSession, searchParams, setSearchParams, shouldConfirm, tossRedirect]);
-
-  const handleCheckout = async (planCode: string) => {
+  const handlePlanLaunch = useCallback(async (planCode: string) => {
     const api = apiClient(getToken, refreshSession);
-    setCheckoutLoading(planCode);
+    setLaunchingPlanCode(planCode);
+    setError('');
     try {
-      const checkout = await api.post<BillingCheckoutSession>('/billing/checkout', createCheckoutPayload(window.location.href, planCode));
-      await startTossCheckout(checkout);
+      await startAppsInTossBillingLaunch({
+        apiPost: api.post,
+        runtime: hostRuntime,
+        originUrl: window.location.origin + window.location.pathname,
+        planCode
+      });
     } catch (err) {
-      setError(describeApiError(err, 'billing_checkout'));
+      if (err instanceof HostBridgeError) {
+        if (err.code === 'payment_not_supported' || err.code === 'host_unavailable') {
+          setError(copy.billing.planActionUnavailableNote);
+        } else {
+          setError(copy.billing.launchFailedNotice);
+        }
+      } else {
+        setError(describeApiError(err, 'billing_launch'));
+      }
     } finally {
-      setCheckoutLoading(null);
+      setLaunchingPlanCode('');
     }
-  };
+  }, [copy.billing.launchFailedNotice, copy.billing.planActionUnavailableNote, getToken, hostRuntime, refreshSession]);
 
   return (
     <div className="min-h-screen bg-background p-4">
@@ -129,21 +111,14 @@ export default function ScreenBilling() {
           </div>
         </div>
 
-        {confirmingReturn && (
-          <StatusBanner>
-            {t('common.confirming')}
+        {hostNotice && (
+          <StatusBanner tone={hostRuntime.platform === 'unknown' ? 'danger' : 'neutral'}>
+            {hostNotice}
           </StatusBanner>
         )}
-        {!confirmingReturn && confirmSuccess && checkoutResult === 'success' && (
-          <StatusBanner tone="success">
-            {t('billing.checkoutSuccess', {
-              plan: checkoutPlan ? t('billing.checkoutSuccessPlan', { plan: checkoutPlan }) : ''
-            })}
-          </StatusBanner>
-        )}
-        {!confirmingReturn && !shouldConfirm && checkoutResult === 'cancel' && (
+        {legacyNotice && (
           <StatusBanner>
-            {t('billing.checkoutCancelled')}
+            {legacyNotice}
           </StatusBanner>
         )}
         {error && (
@@ -152,10 +127,12 @@ export default function ScreenBilling() {
           </StatusBanner>
         )}
 
-        {/* Current Subscription */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle>{t('billing.currentSubscription')}</CardTitle>
+            <div className="space-y-1">
+              <CardTitle>{copy.billing.currentPlanTitle}</CardTitle>
+              <p className="text-sm text-muted-foreground">{copy.billing.currentPlanDescription}</p>
+            </div>
             <Button variant="outline" size="sm" onClick={() => void load()}>
               {t('billing.reload')}
             </Button>
@@ -198,13 +175,15 @@ export default function ScreenBilling() {
           </CardContent>
         </Card>
 
-        {/* Plans */}
         <div>
-          <h2 className="text-lg font-semibold tracking-tighter text-foreground mb-4">{t('billing.availablePlans')}</h2>
+          <div className="mb-4 space-y-1">
+            <h2 className="text-lg font-semibold tracking-tighter text-foreground">{copy.billing.plansTitle}</h2>
+            <p className="text-sm text-muted-foreground">{copy.billing.plansDescription}</p>
+          </div>
           {loading ? (
             <p className="text-sm text-muted-foreground">{t('billing.loadingPlans')}</p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-stretch">
+            <div className="grid grid-cols-1 gap-4 items-stretch sm:grid-cols-3">
               {plans.map(plan => {
                 const isCurrent = subscription?.planCode === plan.code;
                 return (
@@ -218,7 +197,7 @@ export default function ScreenBilling() {
                     )}
                   >
                     <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-3">
                         <CardTitle className="text-base">{plan.displayName}</CardTitle>
                         {isCurrent && (
                           <Badge className="bg-primary text-primary-foreground text-xs border-0">
@@ -227,29 +206,36 @@ export default function ScreenBilling() {
                         )}
                       </div>
                     </CardHeader>
-                    <CardContent className="flex flex-col gap-4 flex-1">
+                    <CardContent className="flex flex-1 flex-col gap-4">
                       <div className="text-3xl font-bold tracking-tighter text-foreground">
                         {plan.priceKrw > 0 ? `₩${plan.priceKrw.toLocaleString()}` : t('billing.free')}
                         {plan.priceKrw > 0 && (
                           <span className="text-sm font-normal text-muted-foreground">{t('billing.perMonth')}</span>
                         )}
                       </div>
-                      <div className="text-xs text-muted-foreground flex-1">
+                      <div className="flex-1 text-xs text-muted-foreground">
                         {t('billing.maxSession', { min: plan.maxSessionMinutes })}
                       </div>
                       <Button
-                        className="w-full mt-auto"
+                        className="mt-auto w-full"
                         size="sm"
-                        variant={isCurrent ? 'secondary' : 'default'}
-                        onClick={() => void handleCheckout(plan.code)}
-                        disabled={isCurrent || confirmingReturn || checkoutLoading === plan.code}
+                        variant={isCurrent ? 'secondary' : appsInTossAvailable ? 'default' : 'outline'}
+                        disabled={isCurrent || !!launchingPlanCode || !appsInTossAvailable}
+                        onClick={() => void handlePlanLaunch(plan.code)}
                       >
-                        {checkoutLoading === plan.code || confirmingReturn
-                          ? t('billing.processing')
-                          : isCurrent
+                        {isCurrent
                           ? t('billing.currentPlan')
-                          : t('billing.upgradeTo', { name: plan.displayName })}
+                          : launchingPlanCode === plan.code
+                            ? t('common.loading')
+                            : copy.billing.planActionLabel}
                       </Button>
+                      {!isCurrent && !appsInTossAvailable && (
+                        <p className="text-xs text-muted-foreground">
+                          {hostRuntime.platform === 'web'
+                            ? copy.billing.planActionWebNote
+                            : copy.billing.planActionUnavailableNote}
+                        </p>
+                      )}
                     </CardContent>
                   </Card>
                 );
