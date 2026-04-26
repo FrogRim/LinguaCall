@@ -5,7 +5,7 @@ export default defineConfig({
   brand: {
     displayName: 'LinguaCall',
     primaryColor: '#3182F6',
-    icon: '/favicon.ico',
+    icon: '/icon.png',
   },
   web: {
     host: 'localhost',
