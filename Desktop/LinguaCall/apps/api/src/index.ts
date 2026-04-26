@@ -9,6 +9,7 @@ import sessionsRouter from "./routes/sessions";
 import callsRouter from "./routes/calls";
 import workersRouter from "./routes/workers";
 import reportsRouter from "./routes/reports";
+import authRouter from "./routes/auth";
 import billingRouter from "./routes/billing";
 import dictionaryRouter from "./routes/dictionary";
 import translateRouter from "./routes/translate";
@@ -82,6 +83,7 @@ app.get("/healthz", (_req, res) => {
   return;
 });
 
+app.use("/auth", authRouter);
 app.use("/users", usersRouter);
 app.use("/sessions", sessionsRouter);
 app.use("/calls", callsRouter);

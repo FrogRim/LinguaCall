@@ -4,6 +4,7 @@ import {
   toSupabaseSubject,
   verifySupabaseAccessToken
 } from "../modules/auth/supabase";
+import { verifyAppsInTossJwt } from "../modules/auth/appsInTossJwt";
 import { encryptPhoneForStorage } from "../lib/piiSecurity";
 
 export interface AuthenticatedRequest extends Request {
@@ -101,6 +102,15 @@ export function createRequireAuthenticatedUser(
         const authReq = req as AuthenticatedRequest;
         authReq.userId = identity.userId;
         authReq.clerkUserId = identity.clerkUserId;
+        next();
+        return;
+      }
+
+      const appsInTossPayload = verifyAppsInTossJwt(bearerToken);
+      if (appsInTossPayload) {
+        const authReq = req as AuthenticatedRequest;
+        authReq.userId = appsInTossPayload.userId;
+        authReq.clerkUserId = appsInTossPayload.clerkUserId;
         next();
         return;
       }

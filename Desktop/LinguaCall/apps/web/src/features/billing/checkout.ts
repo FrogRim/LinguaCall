@@ -1,4 +1,4 @@
-import type { AppsInTossPaymentLaunchSession } from '@lingua/shared';
+import type { AppsInTossPaymentLaunchSession, BillingCheckoutSession, UserSubscription } from '@lingua/shared';
 import { canLaunchAppsInTossPayment, HostBridgeError, launchAppsInTossPayment, requestAppsInTossLogin } from '../../lib/hostBridge';
 import type { HostRuntime } from '../../lib/hostRuntime';
 
@@ -39,6 +39,7 @@ export interface BillingReturnState {
   tossRedirect: TossRedirectParams | null;
   shouldConfirm: boolean;
   hasLegacyReturn: boolean;
+  channel: 'web' | 'appintoss' | null;
 }
 
 export const buildBillingReturnUrl = (
@@ -101,7 +102,8 @@ export const readBillingReturnState = (
     checkoutPlan,
     tossRedirect,
     shouldConfirm: checkoutResult === "success" && tossRedirect !== null,
-    hasLegacyReturn: checkoutResult !== null || tossRedirect !== null
+    hasLegacyReturn: checkoutResult !== null || tossRedirect !== null,
+    channel: tossRedirect !== null ? 'web' : checkoutResult !== null ? 'appintoss' : null
   };
 };
 
@@ -185,4 +187,26 @@ export async function startAppsInTossBillingLaunch(
   const payload = createCheckoutPayload(options.originUrl, options.planCode);
   const session = await options.apiPost<AppsInTossPaymentLaunchSession>("/billing/apps-in-toss/payment-launch", payload);
   await launchAppsInTossPayment(session, options.runtime);
+}
+
+export async function startWebBillingCheckout(options: {
+  apiPost: <TResponse>(url: string, body: object) => Promise<TResponse>;
+  originUrl: string;
+  planCode: string;
+}): Promise<BillingCheckoutSession> {
+  const payload = createCheckoutPayload(options.originUrl, options.planCode);
+  return options.apiPost<BillingCheckoutSession>('/billing/checkout', payload);
+}
+
+export async function confirmWebBillingCheckout(options: {
+  apiPost: <TResponse>(url: string, body: object) => Promise<TResponse>;
+  paymentKey: string;
+  orderId: string;
+  amount: number;
+}): Promise<UserSubscription> {
+  return options.apiPost<UserSubscription>('/billing/toss/confirm', {
+    paymentKey: options.paymentKey,
+    orderId: options.orderId,
+    amount: options.amount
+  });
 }

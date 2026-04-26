@@ -24,7 +24,8 @@ type UserContextValue = {
   verifyPhoneOtp: (phone: string, code: string) => Promise<void>;
 };
 
-const UserContext = createContext<UserContextValue | null>(null);
+export const UserContext = createContext<UserContextValue | null>(null);
+export type { UserContextValue };
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const [uiLanguage, setUiLanguageState] = useState<UiLanguageCode>(getCachedUiLanguage);

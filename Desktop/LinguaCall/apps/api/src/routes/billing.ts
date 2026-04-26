@@ -663,16 +663,36 @@ const handleAppsInTossPaymentLaunch = async (
 };
 
 const handleCheckoutSession = async (
-  _req: AuthenticatedRequest,
+  req: AuthenticatedRequest,
   res: Response<ApiResponse<BillingCheckoutSession>>
 ) => {
-  res.status(403).json({
-    ok: false,
-    error: {
-      code: "forbidden",
-      message: "web checkout is disabled; complete payment inside Apps in Toss"
+  if (!req.body || typeof req.body !== "object") {
+    res.status(422).json({
+      ok: false,
+      error: { code: "validation_error", message: "invalid checkout payload" }
+    });
+    return;
+  }
+  try {
+    const checkout = await billingRepository.createCheckoutSession(
+      req.clerkUserId,
+      sanitizeCheckoutPayload(req.body as CreateCheckoutSessionPayload)
+    );
+    res.status(200).json({ ok: true, data: checkout });
+  } catch (error) {
+    if (error instanceof AppError && error.code === "validation_error") {
+      res.status(422).json({ ok: false, error: { code: "validation_error", message: error.message } });
+      return;
     }
-  });
+    if (error instanceof AppError && error.code === "not_found") {
+      res.status(404).json({ ok: false, error: { code: "not_found", message: error.message } });
+      return;
+    }
+    res.status(400).json({
+      ok: false,
+      error: { code: "validation_error", message: "failed_to_create_checkout_session" }
+    });
+  }
 };
 
 router.post("/apps-in-toss/verify-session", requireAuthenticatedUser, handleAppsInTossVerifySession);
@@ -680,18 +700,90 @@ router.post("/apps-in-toss/payment-launch", requireAuthenticatedUser, handleApps
 router.post("/checkout", requireAuthenticatedUser, handleCheckoutSession);
 router.post("/checkout-sessions", requireAuthenticatedUser, handleCheckoutSession);
 
-// Toss Payments — confirm a payment and activate subscription
+// Toss Payments — confirm a web payment and activate subscription
 router.post(
   "/toss/confirm",
   requireAuthenticatedUser,
-  async (_req: AuthenticatedRequest, res: Response<ApiResponse<UserSubscription>>) => {
-    res.status(403).json({
-      ok: false,
-      error: {
-        code: "forbidden",
-        message: "web payment confirmation is disabled; complete payment inside Apps in Toss"
+  async (req: AuthenticatedRequest, res: Response<ApiResponse<UserSubscription>>) => {
+    const { paymentKey, orderId, amount } = req.body as {
+      paymentKey?: string;
+      orderId?: string;
+      amount?: number;
+    };
+
+    if (!paymentKey || !orderId || amount == null) {
+      res.status(422).json({
+        ok: false,
+        error: { code: "validation_error", message: "paymentKey, orderId, and amount are required" }
+      });
+      return;
+    }
+
+    const claimed = await billingRepository.claimPendingCheckout(orderId);
+    if (!claimed) {
+      res.status(422).json({
+        ok: false,
+        error: { code: "validation_error", message: "pending checkout not found or already processed" }
+      });
+      return;
+    }
+
+    if (claimed.amount !== amount) {
+      await billingRepository.releasePendingCheckout(orderId, claimed.confirmationToken);
+      res.status(422).json({
+        ok: false,
+        error: { code: "validation_error", message: "amount mismatch" }
+      });
+      return;
+    }
+
+    const tossSecretKey = process.env.TOSS_SECRET_KEY?.trim();
+    if (!tossSecretKey) {
+      await billingRepository.releasePendingCheckout(orderId, claimed.confirmationToken);
+      res.status(500).json({
+        ok: false,
+        error: { code: "validation_error", message: "payment provider not configured" }
+      });
+      return;
+    }
+
+    try {
+      const encoded = Buffer.from(`${tossSecretKey}:`).toString("base64");
+      const tossRes = await fetch("https://api.tosspayments.com/v1/payments/confirm", {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${encoded}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ paymentKey, orderId, amount })
+      });
+
+      if (!tossRes.ok) {
+        await billingRepository.releasePendingCheckout(orderId, claimed.confirmationToken);
+        res.status(422).json({
+          ok: false,
+          error: { code: "validation_error", message: "toss payment confirmation failed" }
+        });
+        return;
       }
-    });
+
+      await billingRepository.completePendingCheckout(orderId, claimed.confirmationToken);
+      const subscription = await billingRepository.handleWebhook({
+        eventType: "payment.completed",
+        provider: TOSS_PROVIDER,
+        clerkUserId: claimed.clerkUserId,
+        planCode: claimed.planCode,
+        status: "active"
+      });
+
+      res.status(200).json({ ok: true, data: subscription });
+    } catch {
+      await billingRepository.releasePendingCheckout(orderId, claimed.confirmationToken);
+      res.status(500).json({
+        ok: false,
+        error: { code: "validation_error", message: "payment confirmation error" }
+      });
+    }
   }
 );
 

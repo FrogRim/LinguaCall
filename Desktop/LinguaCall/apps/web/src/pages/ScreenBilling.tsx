@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import type { AppsInTossPaymentLaunchSession, UserSubscription, BillingPlan } from '@lingua/shared';
+import type { UserSubscription, BillingPlan } from '@lingua/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -11,9 +11,7 @@ import { useUser } from '../context/UserContext';
 import { apiClient, describeApiError } from '../lib/api';
 import LanguagePicker from '../components/ui/LanguagePicker';
 import { getFriendlyCopy } from '../content/friendlyCopy';
-import { readBillingReturnState, startAppsInTossBillingLaunch } from '../features/billing/checkout';
-import { canLaunchAppsInTossPayment, HostBridgeError } from '../lib/hostBridge';
-import { getHostRuntime } from '../lib/hostRuntime';
+import { readBillingReturnState, confirmWebBillingCheckout } from '../features/billing/checkout';
 
 export default function ScreenBilling() {
   const { i18n, t } = useTranslation();
@@ -21,15 +19,8 @@ export default function ScreenBilling() {
   const navigate = useNavigate();
 
   const returnState = readBillingReturnState(window.location.href);
-  const { checkoutResult, hasLegacyReturn } = returnState;
+  const { checkoutResult, hasLegacyReturn, shouldConfirm, tossRedirect } = returnState;
   const copy = getFriendlyCopy(i18n.language);
-  const hostRuntime = getHostRuntime();
-  const appsInTossAvailable = canLaunchAppsInTossPayment(hostRuntime);
-  const hostNotice = appsInTossAvailable
-    ? copy.billing.appsInTossReadyNotice
-    : hostRuntime.platform === 'unknown' || hostRuntime.platform === 'apps-in-toss'
-      ? copy.billing.hostUnavailableNotice
-      : '';
   const legacyNotice = hasLegacyReturn
     ? checkoutResult === 'success'
       ? copy.billing.legacyReturnSuccessNotice
@@ -72,31 +63,27 @@ export default function ScreenBilling() {
     window.history.replaceState({}, document.title, cleanUrl);
   }, [hasLegacyReturn]);
 
-  const handlePlanLaunch = useCallback(async (planCode: string) => {
+  useEffect(() => {
+    if (!shouldConfirm || !tossRedirect) return;
     const api = apiClient(getToken, refreshSession);
+    setLoading(true);
+    confirmWebBillingCheckout({ apiPost: api.post, ...tossRedirect })
+      .then(() => void load())
+      .catch((err) => setError(describeApiError(err, 'billing_confirm')))
+      .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally run once on mount to handle Toss redirect return
+
+  const handlePlanLaunch = useCallback(async (planCode: string) => {
     setLaunchingPlanCode(planCode);
     setError('');
     try {
-      await startAppsInTossBillingLaunch({
-        apiPost: api.post,
-        runtime: hostRuntime,
-        originUrl: window.location.origin + window.location.pathname,
-        planCode
-      });
-    } catch (err) {
-      if (err instanceof HostBridgeError) {
-        if (err.code === 'payment_not_supported' || err.code === 'host_unavailable') {
-          setError(copy.billing.planActionUnavailableNote);
-        } else {
-          setError(copy.billing.launchFailedNotice);
-        }
-      } else {
-        setError(describeApiError(err, 'billing_launch'));
-      }
+      // web Toss checkout: backend ready, redirect intentionally disabled pending billing-key review
+      setError(copy.billing.planActionWebNote);
     } finally {
       setLaunchingPlanCode('');
     }
-  }, [copy.billing.launchFailedNotice, copy.billing.planActionUnavailableNote, getToken, hostRuntime, refreshSession]);
+  }, [copy.billing.planActionWebNote]);
 
   return (
     <div className="min-h-screen bg-background p-4">
@@ -111,11 +98,6 @@ export default function ScreenBilling() {
           </div>
         </div>
 
-        {hostNotice && (
-          <StatusBanner tone={hostRuntime.platform === 'unknown' ? 'danger' : 'neutral'}>
-            {hostNotice}
-          </StatusBanner>
-        )}
         {legacyNotice && (
           <StatusBanner>
             {legacyNotice}
@@ -219,8 +201,8 @@ export default function ScreenBilling() {
                       <Button
                         className="mt-auto w-full"
                         size="sm"
-                        variant={isCurrent ? 'secondary' : appsInTossAvailable ? 'default' : 'outline'}
-                        disabled={isCurrent || !!launchingPlanCode || !appsInTossAvailable}
+                        variant={isCurrent ? 'secondary' : 'default'}
+                        disabled={isCurrent || !!launchingPlanCode}
                         onClick={() => void handlePlanLaunch(plan.code)}
                       >
                         {isCurrent
@@ -229,13 +211,6 @@ export default function ScreenBilling() {
                             ? t('common.loading')
                             : copy.billing.planActionLabel}
                       </Button>
-                      {!isCurrent && !appsInTossAvailable && (
-                        <p className="text-xs text-muted-foreground">
-                          {hostRuntime.platform === 'web'
-                            ? copy.billing.planActionWebNote
-                            : copy.billing.planActionUnavailableNote}
-                        </p>
-                      )}
                     </CardContent>
                   </Card>
                 );
