@@ -1,31 +1,16 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { requestAppsInTossLogin } from './hostBridge';
-import { getHostRuntime } from './hostRuntime';
+import { appLogin } from '@apps-in-toss/web-framework';
 
 const SESSION_STORAGE_KEY = 'appsintoss_jwt';
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000';
 
-type LoginResult = { authorizationCode?: string; authorization_code?: string; referrer?: string };
-
-function readLoginResult(value: unknown): { authorizationCode: string; referrer: string } | null {
-  if (typeof value !== 'object' || value === null) return null;
-  const v = value as LoginResult;
-  const authorizationCode = (typeof v.authorizationCode === 'string' ? v.authorizationCode : typeof v.authorization_code === 'string' ? v.authorization_code : '').trim();
-  const referrer = (typeof v.referrer === 'string' ? v.referrer : '').trim();
-  if (!authorizationCode || !referrer) return null;
-  return { authorizationCode, referrer };
-}
-
 async function performLogin(): Promise<string> {
-  const runtime = getHostRuntime();
-  const raw = await requestAppsInTossLogin(runtime);
-  const loginResult = readLoginResult(raw);
-  if (!loginResult) throw new Error('invalid_login_result');
+  const { authorizationCode, referrer } = await appLogin();
 
   const res = await fetch(`${API_BASE}/auth/apps-in-toss/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(loginResult),
+    body: JSON.stringify({ authorizationCode, referrer }),
   });
   if (!res.ok) throw new Error('login_failed');
 
