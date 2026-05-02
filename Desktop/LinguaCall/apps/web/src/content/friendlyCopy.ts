@@ -74,20 +74,20 @@ const COPY = {
     },
     billing: {
       eyebrow: 'Plans and billing',
-      title: 'Check your access here, then complete payment inside Apps in Toss.',
+      title: 'Compare plans here, then continue payment in Apps in Toss.',
       description:
-        'The web billing page stays available for plan and subscription visibility, but new payments now open only inside Apps in Toss.',
+        'On the standalone web app, this screen stays focused on plan comparison and current subscription visibility. Actual payment continues only inside Apps in Toss through the in-app bridge.',
       trustPoints: [
-        'Apps in Toss payment only',
-        'Subscription status stays visible on web',
-        'No web checkout is started here'
+        'Plan comparison on web',
+        'In-app bridge inside Apps in Toss',
+        'Subscription status visible on web and in-app'
       ],
       currentPlanTitle: 'Your current access',
       currentPlanDescription:
-        'Review what is active now and use Apps in Toss when you need to change plans.',
-      plansTitle: 'Plans you can compare before entering Apps in Toss',
+        'Review what is active now here. If you need a paid plan change, reopen billing inside Apps in Toss to continue.',
+      plansTitle: 'Plans available in Apps in Toss checkout',
       plansDescription:
-        'Plan details stay visible on web so you can review them calmly before paying in the Toss app.',
+        'Use this screen to compare plans first. Payment starts only inside Apps in Toss when the payment bridge is available.',
       planActionLabel: 'Continue in Apps in Toss',
       planActionWebNote: 'Plan changes stay available only inside Apps in Toss.',
       planActionUnavailableNote: 'Reopen this page from Apps in Toss to continue with payment.',
@@ -182,17 +182,21 @@ const COPY = {
     },
     billing: {
       eyebrow: '플랜과 결제',
-      title: '웹에서는 이용 상태만 확인하고, 결제는 Apps in Toss 안에서 진행합니다.',
+      title: '여기서 플랜을 비교하고, 결제는 Apps in Toss에서 이어갑니다.',
       description:
-        '웹 결제 진입은 중단했고, 현재 페이지는 플랜 비교와 구독 상태 확인용으로만 유지합니다. 실제 결제 변경은 Apps in Toss에서 진행합니다.',
-      trustPoints: ['Apps in Toss 전용 결제', '웹에서도 구독 상태 확인 가능', '여기서는 웹 체크아웃을 시작하지 않음'],
+        '단독 웹에서는 이 화면이 플랜 비교와 현재 구독 확인에 집중합니다. 실제 결제는 Apps in Toss 안에서 인앱 결제 브리지를 통해서만 이어집니다.',
+      trustPoints: [
+        '웹에서 플랜 비교',
+        '앱인토스에서는 가능할 때 네이티브 결제 브리지',
+        '웹·앱 어디서나 구독 상태 확인 가능'
+      ],
       currentPlanTitle: '현재 이용 상태',
       currentPlanDescription:
-        '지금 활성화된 플랜을 먼저 확인하고, 변경이 필요하면 Apps in Toss에서 이어서 진행하면 됩니다.',
-      plansTitle: 'Apps in Toss로 들어가기 전에 플랜 비교하기',
+        '여기서 현재 플랜을 확인하고, 유료 플랜 변경이 필요하면 Apps in Toss 안에서 다시 이어가면 됩니다.',
+      plansTitle: 'Apps in Toss 결제 전 플랜 비교',
       plansDescription:
-        '웹에서는 플랜 내용을 차분히 비교만 하고, 실제 결제는 토스 앱 안에서 안전하게 진행합니다.',
-      planActionLabel: 'Apps in Toss에서 이어서 진행',
+        '이 화면에서는 먼저 플랜만 비교합니다. 실제 결제 시작은 Apps in Toss에서 결제 브리지가 준비된 경우에만 가능합니다.',
+      planActionLabel: 'Apps in Toss에서 이어가기',
       planActionWebNote: '플랜 변경은 Apps in Toss 안에서만 진행할 수 있습니다.',
       planActionUnavailableNote: '결제를 이어가려면 Apps in Toss 최신 진입 경로에서 이 페이지를 다시 열어 주세요.',
       launchFailedNotice: '지금은 Apps in Toss 결제 연결을 열지 못했습니다. 최신 인앱 진입 경로에서 다시 시도해 주세요.',

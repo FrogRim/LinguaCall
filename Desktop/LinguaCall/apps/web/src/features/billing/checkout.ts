@@ -42,6 +42,11 @@ export interface BillingReturnState {
   channel: 'web' | 'appintoss' | null;
 }
 
+export interface WebBillingLaunchResolution {
+  shouldStartCheckout: boolean;
+  errorMessage: string;
+}
+
 export const buildBillingReturnUrl = (
   originUrl: string,
   result: BillingCheckoutResult,
@@ -146,6 +151,10 @@ type AppsInTossVerifySessionPayload = {
   referrer: string;
 };
 
+const readAppsInTossLoginBridge = (runtime: HostRuntime) => {
+  return typeof runtime.bridge?.appLogin === 'function';
+};
+
 const readAppsInTossLoginResult = (
   value: unknown
 ): AppsInTossVerifySessionPayload => {
@@ -187,6 +196,45 @@ export async function startAppsInTossBillingLaunch(
   const payload = createCheckoutPayload(options.originUrl, options.planCode);
   const session = await options.apiPost<AppsInTossPaymentLaunchSession>("/billing/apps-in-toss/payment-launch", payload);
   await launchAppsInTossPayment(session, options.runtime);
+}
+
+export function resolveWebBillingLaunch(planActionWebNote: string): WebBillingLaunchResolution {
+  return {
+    shouldStartCheckout: false,
+    errorMessage: planActionWebNote
+  };
+}
+
+export function resolveBillingLaunch(
+  runtime: HostRuntime,
+  notices: {
+    webNote: string;
+    appsInTossUnavailableNote: string;
+    hostUnavailableNotice: string;
+  }
+): WebBillingLaunchResolution {
+  if (canLaunchAppsInTossPayment(runtime) && readAppsInTossLoginBridge(runtime)) {
+    return {
+      shouldStartCheckout: true,
+      errorMessage: ""
+    };
+  }
+
+  if (runtime.platform === 'web') {
+    return resolveWebBillingLaunch(notices.webNote);
+  }
+
+  if (runtime.platform === 'apps-in-toss') {
+    return {
+      shouldStartCheckout: false,
+      errorMessage: notices.appsInTossUnavailableNote
+    };
+  }
+
+  return {
+    shouldStartCheckout: false,
+    errorMessage: notices.hostUnavailableNotice
+  };
 }
 
 export async function startWebBillingCheckout(options: {

@@ -11,7 +11,14 @@ import { useUser } from '../context/UserContext';
 import { apiClient, describeApiError } from '../lib/api';
 import LanguagePicker from '../components/ui/LanguagePicker';
 import { getFriendlyCopy } from '../content/friendlyCopy';
-import { readBillingReturnState, confirmWebBillingCheckout } from '../features/billing/checkout';
+import {
+  readBillingReturnState,
+  confirmWebBillingCheckout,
+  resolveBillingLaunch,
+  startAppsInTossBillingLaunch
+} from '../features/billing/checkout';
+import { getHostRuntime } from '../lib/hostRuntime';
+import { HostBridgeError } from '../lib/hostBridge';
 
 export default function ScreenBilling() {
   const { i18n, t } = useTranslation();
@@ -74,16 +81,53 @@ export default function ScreenBilling() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally run once on mount to handle Toss redirect return
 
-  const handlePlanLaunch = useCallback(async (planCode: string) => {
-    setLaunchingPlanCode(planCode);
-    setError('');
-    try {
-      // web Toss checkout: backend ready, redirect intentionally disabled pending billing-key review
-      setError(copy.billing.planActionWebNote);
-    } finally {
-      setLaunchingPlanCode('');
-    }
-  }, [copy.billing.planActionWebNote]);
+  const handlePlanLaunch = useCallback(
+    async (planCode: string) => {
+      setLaunchingPlanCode(planCode);
+      setError('');
+      try {
+        const runtime = getHostRuntime();
+        const api = apiClient(getToken, refreshSession);
+
+        const launchResolution = resolveBillingLaunch(runtime, {
+          webNote: copy.billing.planActionWebNote,
+          appsInTossUnavailableNote: copy.billing.planActionUnavailableNote,
+          hostUnavailableNotice: copy.billing.hostUnavailableNotice
+        });
+
+        if (!launchResolution.shouldStartCheckout) {
+          setError(launchResolution.errorMessage);
+          return;
+        }
+
+        await startAppsInTossBillingLaunch({
+          apiPost: api.post,
+          runtime,
+          originUrl: window.location.href,
+          planCode
+        });
+        await load();
+        return;
+      } catch (err) {
+        if (err instanceof HostBridgeError) {
+          setError(copy.billing.launchFailedNotice);
+        } else {
+          setError(describeApiError(err, 'billing_checkout'));
+        }
+      } finally {
+        setLaunchingPlanCode('');
+      }
+    },
+    [
+      copy.billing.hostUnavailableNotice,
+      copy.billing.launchFailedNotice,
+      copy.billing.planActionUnavailableNote,
+      copy.billing.planActionWebNote,
+      getToken,
+      load,
+      refreshSession
+    ]
+  );
 
   return (
     <div className="min-h-screen bg-background p-4">

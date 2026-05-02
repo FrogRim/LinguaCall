@@ -9,6 +9,8 @@ import {
   createTossPaymentRequest,
   readBillingReturnState,
   readTossRedirectParams,
+  resolveBillingLaunch,
+  resolveWebBillingLaunch,
   startAppsInTossBillingLaunch
 } from "./checkout";
 
@@ -65,7 +67,8 @@ test("readBillingReturnState keeps both Toss redirect params and billing hash pa
       amount: 9900
     },
     shouldConfirm: true,
-    hasLegacyReturn: true
+    hasLegacyReturn: true,
+    channel: "web"
   });
 });
 
@@ -79,7 +82,8 @@ test("readBillingReturnState does not request confirm on cancelled return", () =
     checkoutPlan: "basic",
     tossRedirect: null,
     shouldConfirm: false,
-    hasLegacyReturn: true
+    hasLegacyReturn: true,
+    channel: "appintoss"
   });
 });
 
@@ -213,24 +217,24 @@ test("startAppsInTossBillingLaunch verifies the host session before requesting a
   }]);
 });
 
-test("billing trust points clearly describe the Apps in Toss-only payment path in Korean", () => {
+test("billing trust points describe web comparison and Apps in Toss checkout in Korean", () => {
   const copy = getFriendlyCopy("ko");
 
   assert.deepEqual(copy.billing.trustPoints, [
-    "Apps in Toss 전용 결제",
-    "웹에서도 구독 상태 확인 가능",
-    "여기서는 웹 체크아웃을 시작하지 않음"
+    "웹에서 플랜 비교",
+    "앱인토스에서는 가능할 때 네이티브 결제 브리지",
+    "웹·앱 어디서나 구독 상태 확인 가능"
   ]);
-  assert.equal(copy.billing.planActionLabel, "Apps in Toss에서 이어서 진행");
+  assert.equal(copy.billing.planActionLabel, "Apps in Toss에서 이어가기");
 });
 
-test("billing trust points clearly describe the Apps in Toss-only payment path in English", () => {
+test("billing trust points describe web comparison and Apps in Toss checkout in English", () => {
   const copy = getFriendlyCopy("en");
 
   assert.deepEqual(copy.billing.trustPoints, [
-    "Apps in Toss payment only",
-    "Subscription status stays visible on web",
-    "No web checkout is started here"
+    "Plan comparison on web",
+    "In-app bridge inside Apps in Toss",
+    "Subscription status visible on web and in-app"
   ]);
   assert.equal(copy.billing.planActionLabel, "Continue in Apps in Toss");
 });
@@ -267,4 +271,96 @@ test("verify copy explains that paid plan changes continue in Apps in Toss in En
 
   assert.equal(copy.verify.steps[2], "Start a short practice call now, or compare plans first and complete any upgrade in Apps in Toss.");
   assert.equal(copy.verify.supportCopy, "The goal is to get you speaking quickly. If you later need a plan change, the payment step continues inside Apps in Toss.");
+});
+
+test("resolveWebBillingLaunch keeps web plan changes blocked and returns the Apps in Toss notice", () => {
+  const result = resolveWebBillingLaunch("Plan changes stay available only inside Apps in Toss.");
+
+  assert.deepEqual(result, {
+    shouldStartCheckout: false,
+    errorMessage: "Plan changes stay available only inside Apps in Toss."
+  });
+});
+
+test("resolveBillingLaunch blocks standalone web checkout and returns the web guidance note", () => {
+  const runtime: HostRuntime = {
+    platform: "web",
+    hasBridge: false,
+    bridge: null
+  };
+
+  const result = resolveBillingLaunch(runtime, {
+    webNote: "Plan changes stay available only inside Apps in Toss.",
+    appsInTossUnavailableNote: "Reopen this page from Apps in Toss to continue with payment.",
+    hostUnavailableNotice: "This page looks like it opened from Toss, but the payment bridge is not available here yet."
+  });
+
+  assert.deepEqual(result, {
+    shouldStartCheckout: false,
+    errorMessage: "Plan changes stay available only inside Apps in Toss."
+  });
+});
+
+test("resolveBillingLaunch returns the reentry note for Apps in Toss without a payment bridge", () => {
+  const runtime: HostRuntime = {
+    platform: "apps-in-toss",
+    hasBridge: false,
+    bridge: {
+      appLogin: async () => ({ authorizationCode: "code", referrer: "tossapp://miniapp" })
+    }
+  };
+
+  const result = resolveBillingLaunch(runtime, {
+    webNote: "Plan changes stay available only inside Apps in Toss.",
+    appsInTossUnavailableNote: "Reopen this page from Apps in Toss to continue with payment.",
+    hostUnavailableNotice: "This page looks like it opened from Toss, but the payment bridge is not available here yet."
+  });
+
+  assert.deepEqual(result, {
+    shouldStartCheckout: false,
+    errorMessage: "Reopen this page from Apps in Toss to continue with payment."
+  });
+});
+
+test("resolveBillingLaunch keeps Apps in Toss blocked when the login bridge is missing", () => {
+  const runtime: HostRuntime = {
+    platform: "apps-in-toss",
+    hasBridge: true,
+    bridge: {
+      makePayment: async () => undefined
+    }
+  };
+
+  const result = resolveBillingLaunch(runtime, {
+    webNote: "Plan changes stay available only inside Apps in Toss.",
+    appsInTossUnavailableNote: "Reopen this page from Apps in Toss to continue with payment.",
+    hostUnavailableNotice: "This page looks like it opened from Toss, but the payment bridge is not available here yet."
+  });
+
+  assert.deepEqual(result, {
+    shouldStartCheckout: false,
+    errorMessage: "Reopen this page from Apps in Toss to continue with payment."
+  });
+});
+
+test("resolveBillingLaunch allows checkout only when Apps in Toss login and payment bridges are both available", () => {
+  const runtime: HostRuntime = {
+    platform: "apps-in-toss",
+    hasBridge: true,
+    bridge: {
+      appLogin: async () => ({ authorizationCode: "code", referrer: "tossapp://miniapp" }),
+      makePayment: async () => undefined
+    }
+  };
+
+  const result = resolveBillingLaunch(runtime, {
+    webNote: "Plan changes stay available only inside Apps in Toss.",
+    appsInTossUnavailableNote: "Reopen this page from Apps in Toss to continue with payment.",
+    hostUnavailableNotice: "This page looks like it opened from Toss, but the payment bridge is not available here yet."
+  });
+
+  assert.deepEqual(result, {
+    shouldStartCheckout: true,
+    errorMessage: ""
+  });
 });

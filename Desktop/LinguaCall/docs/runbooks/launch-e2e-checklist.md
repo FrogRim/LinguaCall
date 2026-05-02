@@ -87,8 +87,8 @@ curl -I "https://APP_DOMAIN"
 
 1. 로그인 상태에서 `https://APP_DOMAIN/#/billing` 진입
 2. 현재 구독 상태와 플랜 비교 UI 확인
-3. 유료 플랜 CTA가 비활성 상태인지 확인
-4. `플랜 변경은 Apps in Toss 안에서만 진행할 수 있습니다.` 같은 안내 문구 확인
+3. 유료 플랜 CTA를 눌러도 checkout이 시작되지 않는지 확인
+4. `플랜 변경은 Apps in Toss 안에서만 진행할 수 있습니다.` 안내 문구 확인
 
 예상 API 호출:
 
@@ -98,22 +98,25 @@ curl -I "https://APP_DOMAIN"
 기대 결과:
 
 - web에서 checkout을 직접 시작하지 않음
-- dead CTA 없이 Apps in Toss 진입 필요성이 명확히 보임
-- `POST /billing/checkout` 또는 `POST /billing/toss/confirm`이 브라우저 플로우에서 발생하지 않음
+- CTA를 눌러도 Toss 리디렉션이나 외부 결제창으로 이동하지 않음
+- Apps in Toss 진입 필요성이 과장 없이 명확히 보임
+- `POST /billing/checkout` 또는 `POST /billing/toss/confirm`이 일반 브라우저 플로우에서 발생하지 않음
 
-### 3.2 Apps in Toss 호스트 모드
+### 3.2 Apps in Toss 결제 준비 상태 수동 검증
 
-1. Apps in Toss 내부 진입 경로로 `/#/billing` 열기
-2. 상단의 in-app payment 준비 notice 확인
-3. 유료 플랜 CTA 활성화 확인
-4. 플랜 선택 후 인앱 결제 handoff 시작
+현재 저장소 기준으로 `ScreenBilling` 화면은 Apps in Toss host + bridge 환경에서만 직접 launch를 연결한다. 따라서 이 단계는 **Apps in Toss 내부 진입이 가능한 운영자/개발자 수동 검증**으로 본다.
+
+1. Apps in Toss 인증이 가능한 테스트 환경에서 `/#/billing` 진입
+2. 초기 로드에서 `GET /billing/subscription`, `GET /billing/plans` 확인
+3. 유료 플랜 CTA 클릭 후 `POST /billing/apps-in-toss/verify-session` 성공 확인
+4. 같은 클릭 흐름에서 `POST /billing/apps-in-toss/payment-launch` 호출 확인
 5. 샌드박스 결제 완료
 6. webhook 처리 후 현재 구독 상태 갱신 확인
 
 예상 API 호출:
 
-- `GET /billing/plans`
 - `GET /billing/subscription`
+- `GET /billing/plans`
 - `POST /billing/apps-in-toss/verify-session`
 - `POST /billing/apps-in-toss/payment-launch`
 - `POST /billing/webhooks/toss`
@@ -122,8 +125,8 @@ curl -I "https://APP_DOMAIN"
 기대 결과:
 
 - verify-session 성공 후에만 payment launch payload 준비 성공
-- Apps in Toss bridge를 통해 인앱 결제로 이어짐
 - webhook 이후 현재 플랜 상태가 별도 수작업 없이 갱신됨
+- Apps in Toss 내부 `/#/billing` 진입에서만 launch가 연결되고, 일반 웹에서는 여전히 launch되지 않음
 
 ### 3.3 레거시/예외 상태
 
