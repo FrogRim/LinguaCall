@@ -41,9 +41,17 @@ const COPY = {
     },
     session: {
       eyebrow: 'Practice hub',
-      title: 'Keep speaking practice short enough to stay consistent.',
+      title: 'See the next speaking action first, then move straight into it.',
       description:
-        'Use a quick session when you have a few minutes, schedule the next one when you want structure, and come back to reports when you need feedback.',
+        'Keep the page centered on the next useful step: return to a live call, confirm the nearest reservation, or start one short session now.',
+      spotlightLiveTitle: 'Live session in progress',
+      spotlightLiveDescription: 'Return to the active call first before browsing anything else.',
+      spotlightScheduledTitle: 'Your next reserved session',
+      spotlightScheduledPrefix: 'The nearest scheduled session is set for',
+      spotlightEmptyTitle: 'Nothing urgent is waiting',
+      spotlightEmptyDescription: 'Start with a short session now, or schedule one clear time later.',
+      constraintTenMinuteOnly: 'Your current access starts with a 10-minute session.',
+      constraintTenOrFifteen: 'Your current plan supports either a 10-minute or 15-minute session.',
       quickActionsTitle: 'Start with one clear action',
       quickActions: [
         {
@@ -52,19 +60,19 @@ const COPY = {
         },
         {
           title: 'Check your next reservation',
-          description: 'See upcoming sessions before you lose track of them.'
+          description: 'Confirm the nearest scheduled session before planning anything else.'
         },
         {
           title: 'Review one recent report',
-          description: 'Use the last report as a gentle next-step guide.'
+          description: 'Use the most recent feedback as your next-step guide.'
         }
       ],
       composerTitle: 'Create your next session',
       composerDescription:
-        'Immediate sessions are best when you want to talk right now. Scheduled sessions are better when you want a little structure.',
+        'Choose the next call format quickly, then move into speaking without extra decision-making.',
       historyTitle: 'Recent sessions',
       historyDescription:
-        'Track what is upcoming, what is live, and what already has a report ready.',
+        'Keep the session list for follow-up: what is live, what is scheduled, and what already has a report ready.',
       liveTitle: 'Live call',
       liveDescription:
         'Keep the focus on connection status, transcript, and a clean end-call action.',
@@ -149,9 +157,17 @@ const COPY = {
     },
     session: {
       eyebrow: '연습 허브',
-      title: '짧은 세션을 꾸준히 이어갈 수 있도록 연습 흐름을 단순하게 만듭니다.',
+      title: '지금 해야 할 다음 말하기 행동이 가장 먼저 보이도록 정리했습니다.',
       description:
-        '지금 바로 한 번 말하고, 필요하면 예약을 잡고, 리포트는 나중에 다시 꺼내보세요. 핵심 행동만 먼저 보이게 정리했습니다.',
+        '진행 중 통화로 돌아가거나, 가장 가까운 예약을 확인하거나, 지금 바로 짧은 세션을 시작하는 흐름에 먼저 집중합니다.',
+      spotlightLiveTitle: '지금 진행 중인 통화',
+      spotlightLiveDescription: '다른 탐색보다 먼저 현재 통화로 돌아가는 것이 좋습니다.',
+      spotlightScheduledTitle: '가장 먼저 확인할 다음 예약',
+      spotlightScheduledPrefix: '가장 가까운 예약 세션은 다음 시간으로 잡혀 있습니다:',
+      spotlightEmptyTitle: '급하게 확인할 항목은 없습니다',
+      spotlightEmptyDescription: '지금 바로 짧은 세션을 시작하거나, 예약 시간 하나만 정해 두면 됩니다.',
+      constraintTenMinuteOnly: '현재 이용 상태에서는 10분 세션부터 시작할 수 있습니다.',
+      constraintTenOrFifteen: '현재 플랜에서는 10분 또는 15분 세션을 선택할 수 있습니다.',
       quickActionsTitle: '가장 먼저 할 행동부터',
       quickActions: [
         {
@@ -160,19 +176,19 @@ const COPY = {
         },
         {
           title: '다음 예약 확인',
-          description: '예정된 세션을 한눈에 보고 놓치지 않도록 합니다.'
+          description: '가장 가까운 예약 세션부터 확인하고 다음 움직임을 정합니다.'
         },
         {
           title: '최근 리포트 다시 보기',
-          description: '지난 피드백을 바로 복습하고 다음 통화에 반영합니다.'
+          description: '가장 최근 피드백을 다음 통화의 기준점으로 삼습니다.'
         }
       ],
       composerTitle: '다음 세션 만들기',
       composerDescription:
-        '지금 바로 말하고 싶다면 즉시 세션, 일정에 맞춰 연습하고 싶다면 예약 세션이 더 잘 맞습니다.',
+        '통화 방식을 빠르게 정하고 바로 다음 말하기 행동으로 이어가면 됩니다.',
       historyTitle: '최근 세션',
       historyDescription:
-        '예약, 진행 중 세션, 리포트가 준비된 완료 세션까지 한 흐름에서 확인합니다.',
+        '세션 목록은 후속 확인용으로 둡니다. 진행 중, 예약됨, 리포트 준비 완료 상태를 한눈에 확인할 수 있습니다.',
       liveTitle: '진행 중 통화',
       liveDescription:
         '통화 중에는 연결 상태와 transcript, 종료 동작만 또렷하게 보이도록 정리합니다.',

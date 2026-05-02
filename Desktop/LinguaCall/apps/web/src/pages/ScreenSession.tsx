@@ -22,13 +22,17 @@ import {
   attachOrDisposeResolvedController,
   planLiveSessionEnd
 } from '../features/session/liveSession';
+import {
+  getSessionConstraintState,
+  selectSessionSpotlight
+} from '../features/session/sessionLaunchView';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import LanguagePicker from '../components/ui/LanguagePicker';
-import { AppShell, HeroSection, PageHeader } from '../components/layout/AppShell';
+import { AppShell, HeroSection } from '../components/layout/AppShell';
 import { SectionCard, MetricCard, StatusBanner, EmptyState } from '../components/layout/SectionCard';
 import { useUser } from '../context/UserContext';
 import { apiClient, describeApiError, normalizeApiError } from '../lib/api';
@@ -53,6 +57,34 @@ function formatSessionTime(utc?: string) {
   const date = new Date(utc);
   if (Number.isNaN(date.getTime())) return utc;
   return date.toLocaleString();
+}
+
+function getSessionStatusLabel(status: string, isKo: boolean) {
+  const labels: Record<string, { ko: string; en: string }> = {
+    ready: { ko: '시작 가능', en: 'Ready' },
+    scheduled: { ko: '예약됨', en: 'Scheduled' },
+    connecting: { ko: '연결 중', en: 'Connecting' },
+    dialing: { ko: '전화 연결 중', en: 'Dialing' },
+    ringing: { ko: '응답 대기 중', en: 'Ringing' },
+    in_progress: { ko: '진행 중', en: 'Live' },
+    ending: { ko: '종료 중', en: 'Ending' },
+    completed: { ko: '완료됨', en: 'Completed' },
+    cancelled: { ko: '취소됨', en: 'Cancelled' },
+    failed: { ko: '실패', en: 'Failed' },
+    provider_error: { ko: '연결 문제', en: 'Provider issue' },
+    user_cancelled: { ko: '사용자 종료', en: 'Ended by user' },
+    schedule_missed: { ko: '예약 시간 경과', en: 'Missed schedule' },
+    no_answer: { ko: '응답 없음', en: 'No answer' }
+  };
+
+  const label = labels[status];
+  return label ? (isKo ? label.ko : label.en) : status.replace(/_/g, ' ');
+}
+
+function getContactModeLabel(mode: string, isKo: boolean) {
+  if (mode === 'scheduled_once') return isKo ? '예약 세션' : 'Scheduled';
+  if (mode === 'immediate') return isKo ? '즉시 세션' : 'Start now';
+  return mode.replace(/_/g, ' ');
 }
 
 function toDateTimeLocalValue(utc?: string) {
@@ -269,11 +301,11 @@ export default function ScreenSession() {
       const list = await api.get<Session[]>('/sessions');
       setSessions(list);
     } catch {
-      setGlobalMessage('failed to load sessions');
+      setGlobalMessage(isKo ? '세션 목록을 불러오지 못했습니다. 다시 시도해 주세요.' : 'Failed to load sessions. Please try again.');
     } finally {
       if (showLoading) setSessionsLoading(false);
     }
-  }, [makeApi]);
+  }, [isKo, makeApi]);
 
   useEffect(() => {
     void loadAccountState();
@@ -323,7 +355,7 @@ export default function ScreenSession() {
 
   const beginWebVoiceSession = async (sessionId: string, join: boolean) => {
     if (activeRef.current?.controller) {
-      setGlobalMessage('another live session is already active.');
+      setGlobalMessage(isKo ? '이미 진행 중인 통화가 있습니다. 먼저 현재 통화를 종료해 주세요.' : 'Another live call is already active. End the current call first.');
       return;
     }
     const api = makeApi();
@@ -333,7 +365,7 @@ export default function ScreenSession() {
       state: 'connecting',
       transcript: [],
       controller: null,
-      note: 'Preparing live audio session...',
+      note: isKo ? '실시간 음성 연결을 준비하고 있습니다...' : 'Preparing your live audio session...',
       isSpeaking: false
     };
     syncActive(initial);
@@ -358,22 +390,22 @@ export default function ScreenSession() {
           "结束吧", "结束会话", "好了"
         ],
         onEarlyExit: () => {
-          setGlobalMessage(isKo ? '종료 키워드가 감지되어 세션을 종료합니다.' : 'Exit keyword detected. Ending session.');
+          setGlobalMessage(isKo ? '종료 요청이 감지되어 세션을 마무리합니다.' : 'Exit request detected. Wrapping up the session.');
         },
         onStateChange: (state, message) => {
           if (!activeRef.current || activeRef.current.sessionId !== sessionId) return;
           syncActive({ ...activeRef.current, state, note: message });
           if (state === 'live') {
-            setGlobalMessage('live session connected. Speak naturally.');
+            setGlobalMessage(isKo ? '통화가 연결되었습니다. 편하게 말해 보세요.' : 'Your call is live. Speak naturally.');
             void loadSessions();
           }
           if (state === 'ended') {
-            setGlobalMessage('live session ended. Report generation may follow shortly.');
+            setGlobalMessage(isKo ? '통화가 종료되었습니다. 리포트는 잠시 후 확인할 수 있습니다.' : 'Call ended. Your report should appear shortly.');
             syncActive(null);
             void loadSessions();
           }
           if (state === 'failed') {
-            setGlobalMessage('live session failed. Check microphone/network and try again.');
+            setGlobalMessage(isKo ? '실시간 통화 연결에 실패했습니다. 마이크나 네트워크를 확인한 뒤 다시 시도해 주세요.' : 'Live call failed to connect. Check your microphone or network and try again.');
             syncActive(null);
             void loadSessions();
           }
@@ -404,7 +436,9 @@ export default function ScreenSession() {
     } catch (error) {
       syncActive(null);
       setGlobalMessage(
-        `call start failed: ${describeApiError(error, join ? 'call_join' : 'call_start')}`
+        isKo
+          ? `통화를 시작하지 못했습니다: ${describeApiError(error, join ? 'call_join' : 'call_start')}`
+          : `Call start failed: ${describeApiError(error, join ? 'call_join' : 'call_start')}`
       );
       await loadSessions();
     }
@@ -434,10 +468,14 @@ export default function ScreenSession() {
       setDetail({ kind: 'idle' });
       await Promise.all([loadSessions(), loadAccountState()]);
       if (session.contactMode === 'scheduled_once') {
-        setFormMessage(`scheduled session created for ${formatSessionTime(session.scheduledForAtUtc)}`);
+        setFormMessage(
+          isKo
+            ? `${formatSessionTime(session.scheduledForAtUtc)}에 예약 세션을 만들었습니다.`
+            : `Scheduled session created for ${formatSessionTime(session.scheduledForAtUtc)}`
+        );
         historyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } else {
-        setFormMessage(isKo ? '세션을 생성했습니다. 통화를 시작합니다...' : 'Session created. Starting call...');
+        setFormMessage(isKo ? '세션을 만들었습니다. 통화를 연결하는 중입니다...' : 'Session created. Connecting your call...');
         void beginWebVoiceSession(session.id, false);
       }
     } catch (err) {
@@ -482,7 +520,7 @@ export default function ScreenSession() {
     const api = makeApi();
     const time = editTimes[sessionId];
     if (!time) {
-      setGlobalMessage('scheduled time is required');
+      setGlobalMessage(isKo ? '예약 시간이 필요합니다.' : 'Scheduled time is required.');
       return;
     }
     try {
@@ -491,11 +529,19 @@ export default function ScreenSession() {
         timezone: 'Asia/Seoul'
       };
       const updated = await api.patch<Session>(`/sessions/${sessionId}`, payload);
-      setGlobalMessage(`updated to ${formatSessionTime(updated.scheduledForAtUtc)}`);
+      setGlobalMessage(
+        isKo
+          ? `예약 시간을 ${formatSessionTime(updated.scheduledForAtUtc)}로 변경했습니다.`
+          : `Schedule updated to ${formatSessionTime(updated.scheduledForAtUtc)}`
+      );
       setDetail({ kind: 'idle' });
       await loadSessions();
     } catch (err) {
-      setGlobalMessage(`update failed: ${describeApiError(err, 'session_update')}`);
+      setGlobalMessage(
+        isKo
+          ? `일정 변경에 실패했습니다: ${describeApiError(err, 'session_update')}`
+          : `Schedule update failed: ${describeApiError(err, 'session_update')}`
+      );
     }
   };
 
@@ -503,11 +549,15 @@ export default function ScreenSession() {
     const api = makeApi();
     try {
       await api.post<Session>(`/sessions/${sessionId}/cancel`, {});
-      setGlobalMessage('session cancelled.');
+      setGlobalMessage(isKo ? '세션을 취소했습니다.' : 'Session cancelled.');
       setDetail({ kind: 'idle' });
       await Promise.all([loadSessions(), loadAccountState()]);
     } catch (err) {
-      setGlobalMessage(`cancel failed: ${describeApiError(err, 'session_cancel')}`);
+      setGlobalMessage(
+        isKo
+          ? `세션 취소에 실패했습니다: ${describeApiError(err, 'session_cancel')}`
+          : `Session cancel failed: ${describeApiError(err, 'session_cancel')}`
+      );
     }
   };
 
@@ -526,9 +576,13 @@ export default function ScreenSession() {
         syncActive(null);
         try {
           await api.post<Session>(`/calls/${sessionId}/end`, {});
-          setGlobalMessage('call ended. Report generation may follow shortly.');
+          setGlobalMessage(isKo ? '통화가 종료되었습니다. 리포트는 잠시 후 확인할 수 있습니다.' : 'Call ended. Your report should appear shortly.');
         } catch (fallbackErr) {
-          setGlobalMessage(`end failed: ${describeApiError(fallbackErr, 'call_end')}`);
+          setGlobalMessage(
+            isKo
+              ? `통화를 종료하지 못했습니다: ${describeApiError(fallbackErr, 'call_end')}`
+              : `Call end failed: ${describeApiError(fallbackErr, 'call_end')}`
+          );
         }
         await Promise.all([loadSessions(), loadAccountState()]);
       }
@@ -537,16 +591,54 @@ export default function ScreenSession() {
 
     try {
       await api.post<Session>(`/calls/${sessionId}/end`, {});
-      setGlobalMessage('call ended. Report generation may follow shortly.');
+      setGlobalMessage(isKo ? '통화가 종료되었습니다. 리포트는 잠시 후 확인할 수 있습니다.' : 'Call ended. Your report should appear shortly.');
       setDetail({ kind: 'idle' });
       await Promise.all([loadSessions(), loadAccountState()]);
     } catch (err) {
-      setGlobalMessage(`end failed: ${describeApiError(err, 'call_end')}`);
+      setGlobalMessage(
+        isKo
+          ? `통화를 종료하지 못했습니다: ${describeApiError(err, 'call_end')}`
+          : `Call end failed: ${describeApiError(err, 'call_end')}`
+      );
     }
   };
 
   const activePlanDetails = plans.find(plan => plan.code === profile?.planCode) ?? null;
-  const bannerTone = globalMessage.includes('failed') || globalMessage.includes('error') ? 'danger' : 'neutral';
+  const spotlight = selectSessionSpotlight({
+    activeSessionId: activeSession?.sessionId ?? null,
+    sessions
+  });
+
+  const constraintMessage =
+    getSessionConstraintState(durationOptions) === 'ten_or_fifteen'
+      ? copy.session.constraintTenOrFifteen
+      : copy.session.constraintTenMinuteOnly;
+
+  const spotlightTitle =
+    spotlight.kind === 'live'
+      ? copy.session.spotlightLiveTitle
+      : spotlight.kind === 'scheduled'
+        ? copy.session.spotlightScheduledTitle
+        : copy.session.spotlightEmptyTitle;
+
+  const spotlightDescription =
+    spotlight.kind === 'live'
+      ? copy.session.spotlightLiveDescription
+      : spotlight.kind === 'scheduled'
+        ? `${copy.session.spotlightScheduledPrefix} ${formatSessionTime(spotlight.scheduledForAtUtc)}`
+        : copy.session.spotlightEmptyDescription;
+
+  const readyNowLabel =
+    profile?.paidMinutesBalance && profile.paidMinutesBalance > 0
+      ? (isKo ? '지금 바로 쓸 수 있는 분수' : 'Minutes ready now')
+      : (isKo ? '남은 체험 통화' : 'Trial calls left');
+
+  const readyNowValue =
+    profile?.paidMinutesBalance && profile.paidMinutesBalance > 0
+      ? `${profile.paidMinutesBalance} min`
+      : String(profile?.trialCallsRemaining ?? 0);
+
+  const bannerTone = /failed|error|못했습니다|실패했습니다|필요합니다/i.test(globalMessage) ? 'danger' : 'neutral';
 
   return (
     <AppShell
@@ -567,21 +659,24 @@ export default function ScreenSession() {
         title={copy.session.title}
         description={copy.session.description}
         aside={
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+          <div className="space-y-3">
             <MetricCard
               label={isKo ? '현재 플랜' : 'Current plan'}
               value={activePlanDetails?.displayName ?? (profile?.planCode ?? 'free')}
               tone="primary"
               detail={subscription?.status ?? (isKo ? '활성 상태' : 'active state')}
             />
-            <MetricCard
-              label={isKo ? '체험 통화' : 'Trial calls'}
-              value={String(profile?.trialCallsRemaining ?? 0)}
-            />
-            <MetricCard
-              label={isKo ? '유료 분수' : 'Paid minutes'}
-              value={String(profile?.paidMinutesBalance ?? 0)}
-            />
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+              <MetricCard
+                label={readyNowLabel}
+                value={readyNowValue}
+              />
+              <MetricCard
+                label={isKo ? '세션 길이 기준' : 'Session length access'}
+                value={getSessionConstraintState(durationOptions) === 'ten_or_fifteen' ? '10 / 15 min' : '10 min'}
+                detail={constraintMessage}
+              />
+            </div>
           </div>
         }
       />
@@ -610,6 +705,18 @@ export default function ScreenSession() {
               isKo={isKo}
             />
           )}
+
+          <SectionCard title={spotlightTitle} description={spotlightDescription}>
+            <StatusBanner>{constraintMessage}</StatusBanner>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {copy.session.quickActions.map((action) => (
+                <div key={action.title} className="rounded-xl border border-border bg-secondary px-4 py-4">
+                  <div className="text-sm font-semibold text-foreground">{action.title}</div>
+                  <div className="mt-2 text-sm leading-6 text-muted-foreground">{action.description}</div>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
 
           <div ref={composerRef}>
             <SectionCard title={copy.session.composerTitle} description={copy.session.composerDescription}>
@@ -742,21 +849,9 @@ export default function ScreenSession() {
       </div>
 
       <div ref={historyRef}>
-        <PageHeader
-          eyebrow={copy.session.historyTitle}
+        <SectionCard
           title={t('session.sessionList')}
           description={copy.session.historyDescription}
-          actions={
-            <Button variant="outline" size="sm" onClick={() => void loadSessions()}>
-              {t('common.retry')}
-            </Button>
-          }
-        />
-      </div>
-
-      <SectionCard
-        title={copy.session.historyTitle}
-        description={copy.session.historyDescription}
         action={
           <Button variant="outline" size="sm" onClick={() => void Promise.all([loadSessions(), loadAccountState()])}>
             {t('billing.reload')}
@@ -799,7 +894,8 @@ export default function ScreenSession() {
             ))}
           </div>
         )}
-      </SectionCard>
+        </SectionCard>
+      </div>
     </AppShell>
   );
 }
@@ -868,11 +964,15 @@ function LiveSessionCard({
       <div className="space-y-4 rounded-xl border border-primary/15 bg-primary/[0.05] px-5 py-5">
         <div className="flex items-center justify-between gap-3">
           <div className="space-y-1">
-            <div className="text-sm font-medium text-foreground">{activeSession.note ?? activeSession.state}</div>
-            <div className="text-xs text-muted-foreground">Session ID: {activeSession.sessionId}</div>
+            <div className="text-sm font-medium text-foreground">
+              {activeSession.note ?? getSessionStatusLabel(activeSession.state, isKo)}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {isKo ? '세션 ID' : 'Session ID'}: {activeSession.sessionId}
+            </div>
           </div>
           <Badge variant={activeSession.state === 'live' ? 'default' : 'secondary'}>
-            {activeSession.state}
+            {getSessionStatusLabel(activeSession.state, isKo)}
           </Badge>
         </div>
 
@@ -884,7 +984,7 @@ function LiveSessionCard({
           </div>
         ) : (
           <div className="rounded-xl border border-dashed border-border bg-background px-4 py-5 text-sm text-muted-foreground">
-            {isKo ? '첫 transcript가 들어오면 여기에 바로 표시됩니다.' : 'The first transcript line will appear here.'}
+            {isKo ? '첫 대화 내용이 들어오면 여기에 바로 표시됩니다.' : 'The first line of conversation will appear here.'}
           </div>
         )}
 
@@ -946,10 +1046,12 @@ function SessionRow({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={getStatusBadgeVariant(session.status)}>{session.status}</Badge>
-            <Badge variant="outline">{session.contactMode.replace('_', ' ')}</Badge>
+            <Badge variant={getStatusBadgeVariant(session.status)}>
+              {getSessionStatusLabel(session.status, isKo)}
+            </Badge>
+            <Badge variant="outline">{getContactModeLabel(session.contactMode, isKo)}</Badge>
             {session.reportStatus === 'pending' && (
-              <Badge variant="secondary">{isKo ? '리포트 준비 중' : 'report pending'}</Badge>
+              <Badge variant="secondary">{isKo ? '리포트 생성 중' : 'Report in progress'}</Badge>
             )}
           </div>
           <div className="space-y-1">
@@ -961,11 +1063,11 @@ function SessionRow({
             </div>
             {session.scheduledForAtUtc && (
               <div className="text-sm text-muted-foreground">
-                Scheduled: {formatSessionTime(session.scheduledForAtUtc)}
+                {isKo ? '예약 시간' : 'Scheduled for'}: {formatSessionTime(session.scheduledForAtUtc)}
               </div>
             )}
             {session.failureReason && (
-              <div className="text-sm text-destructive">Failure: {session.failureReason}</div>
+              <div className="text-sm text-destructive">{isKo ? '문제' : 'Issue'}: {session.failureReason}</div>
             )}
           </div>
         </div>
@@ -1017,7 +1119,7 @@ function SessionRow({
             onChange={event => onEditTimeChange(event.target.value)}
           />
           <Button variant="outline" onClick={onUpdateSchedule}>
-            Update
+            {isKo ? '일정 변경' : 'Update schedule'}
           </Button>
         </div>
       )}
@@ -1061,7 +1163,7 @@ function DetailPanel({
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <Badge variant="secondary">transcript</Badge>
+          <Badge variant="secondary">{isKo ? '대화록' : 'Transcript'}</Badge>
           <Button variant="ghost" size="sm" onClick={onClose}>
             {isKo ? '닫기' : 'Close'}
           </Button>
@@ -1086,7 +1188,11 @@ function DetailPanel({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <Badge variant={detail.report.status === 'ready' ? 'default' : 'secondary'}>
-          {detail.report.status}
+          {detail.report.status === 'ready'
+            ? (isKo ? '리포트 준비 완료' : 'Report ready')
+            : detail.report.status === 'failed'
+              ? (isKo ? '리포트 생성 실패' : 'Report failed')
+              : detail.report.status}
         </Badge>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => onOpenStandalone(detail.report)}>
@@ -1103,6 +1209,7 @@ function DetailPanel({
 }
 
 function InlineReport({ report }: { report: Report }) {
+  const { t } = useTranslation();
   const ev = report.evaluation;
 
   return (
@@ -1110,10 +1217,10 @@ function InlineReport({ report }: { report: Report }) {
       {ev && (
         <div className="grid gap-3 sm:grid-cols-4">
           {[
-            { label: 'Total', value: ev.totalScore },
-            { label: 'Grammar', value: ev.grammarScore },
-            { label: 'Vocabulary', value: ev.vocabularyScore },
-            { label: 'Fluency', value: ev.fluencyScore }
+            { label: t('report.scores.total'), value: ev.totalScore },
+            { label: t('report.scores.grammar'), value: ev.grammarScore },
+            { label: t('report.scores.vocabulary'), value: ev.vocabularyScore },
+            { label: t('report.scores.fluency'), value: ev.fluencyScore }
           ].map(item => (
             <MetricCard key={item.label} label={item.label} value={String(item.value)} />
           ))}
