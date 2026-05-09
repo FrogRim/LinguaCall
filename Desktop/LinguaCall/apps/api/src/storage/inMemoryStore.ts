@@ -97,6 +97,7 @@ interface DbSessionRow {
   accuracy_state: unknown | null;
   reserved_trial_call: boolean;
   reserved_minutes: number;
+  reserved_monthly_session: boolean;
   provider_call_sid: string | null;
   last_provider_sequence_number: number;
   created_at: string;
@@ -117,6 +118,9 @@ interface DbUserRow {
   paid_minutes_balance: number;
   plan_code: string;
   ui_language: string;
+  monthly_sessions_used: number;
+  monthly_period_start: string | null;
+  plan_monthly_session_limit?: number;
   created_at: string;
   updated_at: string;
 }
@@ -205,6 +209,7 @@ interface DbPlanRow {
   included_minutes: number;
   trial_calls: number;
   max_session_minutes: number;
+  monthly_session_limit: number;
   entitlements: unknown;
   active: boolean;
   created_at: string;
@@ -357,6 +362,8 @@ class InMemoryStore {
       paidMinutesBalance: row.paid_minutes_balance,
       planCode: row.plan_code,
       uiLanguage: row.ui_language ?? "en",
+      monthlySessionsUsed: row.monthly_sessions_used ?? 0,
+      monthlySessionLimit: row.plan_monthly_session_limit ?? 0,
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
@@ -786,6 +793,7 @@ class InMemoryStore {
       includedMinutes: row.included_minutes,
       trialCalls: row.trial_calls,
       maxSessionMinutes: row.max_session_minutes,
+      monthlySessionLimit: row.monthly_session_limit ?? 0,
       entitlements: row.entitlements,
       active: row.active,
       createdAt: row.created_at,
@@ -954,7 +962,7 @@ class InMemoryStore {
   private async writeLedger(
     client: PoolClient,
     userId: string,
-    unitType: "trial_call" | "paid_minute",
+    unitType: "trial_call" | "paid_minute" | "monthly_session",
     entryKind: "reserve" | "release" | "commit" | "refund" | "grant",
     delta: number,
     sessionId: string | null = null,
@@ -1162,7 +1170,10 @@ class InMemoryStore {
 
   async getUserByClerk(clerkUserId: ClerkUserId): Promise<UserProfile | undefined> {
     const result = await this.pool.query<DbUserRow>(
-      "SELECT * FROM users WHERE clerk_user_id = $1 LIMIT 1",
+      `SELECT u.*, COALESCE(p.monthly_session_limit, 0) AS plan_monthly_session_limit
+       FROM users u
+       LEFT JOIN plans p ON p.code = u.plan_code
+       WHERE u.clerk_user_id = $1 LIMIT 1`,
       [clerkUserId]
     );
     if (!result.rows.length) {
@@ -1441,7 +1452,7 @@ class InMemoryStore {
   async listBillingPlans(): Promise<BillingPlan[]> {
     const result = await this.pool.query<DbPlanRow>(
       `
-        SELECT id, code, display_name, price_krw, included_minutes, trial_calls, max_session_minutes, entitlements, active, created_at, updated_at
+        SELECT id, code, display_name, price_krw, included_minutes, trial_calls, max_session_minutes, monthly_session_limit, entitlements, active, created_at, updated_at
         FROM plans
         WHERE active = true
         ORDER BY price_krw ASC, code ASC
@@ -2858,8 +2869,9 @@ class InMemoryStore {
 
       let reservedTrialCall = sessionRow.reserved_trial_call;
       let reservedMinutes = sessionRow.reserved_minutes;
+      let reservedMonthlySession = sessionRow.reserved_monthly_session ?? false;
 
-      if (!reservedTrialCall && reservedMinutes === 0 && sessionRow.status === "ready") {
+      if (!reservedTrialCall && reservedMinutes === 0 && !reservedMonthlySession && sessionRow.status === "ready") {
         if (userRow.rows[0].trial_calls_remaining > 0) {
           reservedTrialCall = true;
           await client.query(
@@ -2875,23 +2887,63 @@ class InMemoryStore {
             session.id,
             "web voice reservation from trial call"
           );
-        } else if (userRow.rows[0].paid_minutes_balance >= sessionRow.duration_target_minutes) {
-          reservedMinutes = sessionRow.duration_target_minutes;
-          await client.query(
-            "UPDATE users SET paid_minutes_balance = paid_minutes_balance - $2, updated_at = NOW() WHERE id = $1",
-            [sessionRow.user_id, sessionRow.duration_target_minutes]
-          );
-          await this.writeLedger(
-            client,
-            sessionRow.user_id,
-            "paid_minute",
-            "reserve",
-            -sessionRow.duration_target_minutes,
-            session.id,
-            "web voice reservation from paid minutes"
-          );
         } else {
-          throw new AppError(DB_ERROR.INSUFFICIENT_ALLOWANCE, "insufficient allowance for live session");
+          const planResult = await client.query<DbPlanRow>(
+            "SELECT monthly_session_limit FROM plans WHERE code = $1",
+            [userRow.rows[0].plan_code]
+          );
+          const monthlyLimit = planResult.rows[0]?.monthly_session_limit ?? 0;
+
+          if (monthlyLimit > 0) {
+            const now = new Date();
+            const thisPeriodStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+            const currentPeriod = userRow.rows[0].monthly_period_start;
+            let sessionsUsed = userRow.rows[0].monthly_sessions_used ?? 0;
+
+            if (!currentPeriod || currentPeriod < thisPeriodStart) {
+              sessionsUsed = 0;
+              await client.query(
+                "UPDATE users SET monthly_sessions_used = 0, monthly_period_start = $2, updated_at = NOW() WHERE id = $1",
+                [sessionRow.user_id, thisPeriodStart]
+              );
+            }
+
+            if (sessionsUsed >= monthlyLimit) {
+              throw new AppError(DB_ERROR.INSUFFICIENT_ALLOWANCE, "monthly session limit reached");
+            }
+
+            reservedMonthlySession = true;
+            await client.query(
+              "UPDATE users SET monthly_sessions_used = monthly_sessions_used + 1, updated_at = NOW() WHERE id = $1",
+              [sessionRow.user_id]
+            );
+            await this.writeLedger(
+              client,
+              sessionRow.user_id,
+              "monthly_session",
+              "reserve",
+              -1,
+              session.id,
+              "web voice reservation from monthly session quota"
+            );
+          } else if (userRow.rows[0].paid_minutes_balance >= sessionRow.duration_target_minutes) {
+            reservedMinutes = sessionRow.duration_target_minutes;
+            await client.query(
+              "UPDATE users SET paid_minutes_balance = paid_minutes_balance - $2, updated_at = NOW() WHERE id = $1",
+              [sessionRow.user_id, sessionRow.duration_target_minutes]
+            );
+            await this.writeLedger(
+              client,
+              sessionRow.user_id,
+              "paid_minute",
+              "reserve",
+              -sessionRow.duration_target_minutes,
+              session.id,
+              "web voice reservation from paid minutes"
+            );
+          } else {
+            throw new AppError(DB_ERROR.INSUFFICIENT_ALLOWANCE, "insufficient allowance for live session");
+          }
         }
       }
 
@@ -2907,12 +2959,13 @@ class InMemoryStore {
               failure_reason = NULL,
               reserved_trial_call = $2,
               reserved_minutes = $3,
-              accuracy_policy = COALESCE(accuracy_policy, $4::jsonb),
+              reserved_monthly_session = $4,
+              accuracy_policy = COALESCE(accuracy_policy, $5::jsonb),
               updated_at = NOW()
-          WHERE id = $5
+          WHERE id = $6
           RETURNING *
         `,
-        [callId, reservedTrialCall, reservedMinutes, JSON.stringify(accuracyPolicy), session.id]
+        [callId, reservedTrialCall, reservedMinutes, reservedMonthlySession, JSON.stringify(accuracyPolicy), session.id]
       );
       if (updated.rows.length === 0) {
         throw new AppError(DB_ERROR.SESSION_NOT_FOUND, "session not found");
@@ -2969,6 +3022,13 @@ class InMemoryStore {
       if (row.reserved_trial_call || row.reserved_minutes > 0) {
         await this.releaseScheduledAllowance(client, row.user_id, row, "web voice bootstrap failed");
       }
+      if (row.reserved_monthly_session) {
+        await client.query(
+          "UPDATE users SET monthly_sessions_used = GREATEST(0, monthly_sessions_used - 1), updated_at = NOW() WHERE id = $1",
+          [row.user_id]
+        );
+        await this.writeLedger(client, row.user_id, "monthly_session", "refund", 1, row.id, "web voice bootstrap failed — monthly session slot refunded");
+      }
       const updated = await client.query<DbSessionRow>(
         `
           UPDATE sessions
@@ -2976,6 +3036,7 @@ class InMemoryStore {
               failure_reason = $2,
               reserved_trial_call = false,
               reserved_minutes = 0,
+              reserved_monthly_session = false,
               updated_at = NOW()
           WHERE id = $1
           RETURNING *

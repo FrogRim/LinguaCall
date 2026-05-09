@@ -20,6 +20,29 @@ import {
 import { getHostRuntime } from '../lib/hostRuntime';
 import { HostBridgeError } from '../lib/hostBridge';
 
+function formatPlanFeatures(plan: BillingPlan, isKo: boolean): string[] {
+  const features: string[] = [];
+  if (plan.monthlySessionLimit > 0) {
+    features.push(isKo
+      ? `${plan.maxSessionMinutes}분 세션 × 월 ${plan.monthlySessionLimit}회`
+      : `${plan.maxSessionMinutes}-min sessions × ${plan.monthlySessionLimit}/month`);
+  } else if (plan.trialCalls > 0) {
+    features.push(isKo
+      ? `${plan.maxSessionMinutes}분 세션 × 평생 ${plan.trialCalls}회`
+      : `${plan.maxSessionMinutes}-min sessions × ${plan.trialCalls} lifetime`);
+  } else {
+    features.push(isKo
+      ? `최대 ${plan.maxSessionMinutes}분/세션`
+      : `Up to ${plan.maxSessionMinutes} min/session`);
+  }
+  if (plan.code === 'pro') {
+    features.push(isKo ? '전체 리포트 + 오답 패턴 추적' : 'Full report + error pattern tracking');
+  } else if (plan.code !== 'free') {
+    features.push(isKo ? '전체 리포트 열람' : 'Full report access');
+  }
+  return features;
+}
+
 export default function ScreenBilling() {
   const { i18n, t } = useTranslation();
   const { getToken, refreshSession } = useUser();
@@ -28,6 +51,7 @@ export default function ScreenBilling() {
   const returnState = readBillingReturnState(window.location.href);
   const { checkoutResult, hasLegacyReturn, shouldConfirm, tossRedirect } = returnState;
   const copy = getFriendlyCopy(i18n.language);
+  const isKo = i18n.language.startsWith('ko');
   const legacyNotice = hasLegacyReturn
     ? checkoutResult === 'success'
       ? copy.billing.legacyReturnSuccessNotice
@@ -239,9 +263,14 @@ export default function ScreenBilling() {
                           <span className="text-sm font-normal text-muted-foreground">{t('billing.perMonth')}</span>
                         )}
                       </div>
-                      <div className="flex-1 text-xs text-muted-foreground">
-                        {t('billing.maxSession', { min: plan.maxSessionMinutes })}
-                      </div>
+                      <ul className="flex-1 space-y-1">
+                        {formatPlanFeatures(plan, isKo).map((f, i) => (
+                          <li key={i} className="flex gap-2 text-xs text-muted-foreground">
+                            <span className="shrink-0">✓</span>
+                            <span>{f}</span>
+                          </li>
+                        ))}
+                      </ul>
                       <Button
                         className="mt-auto w-full"
                         size="sm"

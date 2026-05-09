@@ -242,6 +242,7 @@ export default function ScreenSession() {
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [globalMessage, setGlobalMessage] = useState('');
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [allowanceBlocked, setAllowanceBlocked] = useState(false);
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [plans, setPlans] = useState<BillingPlan[]>([]);
 
@@ -435,6 +436,12 @@ export default function ScreenSession() {
       }
     } catch (error) {
       syncActive(null);
+      const apiErr = normalizeApiError(error);
+      if (apiErr?.code === 'insufficient_allowance') {
+        setAllowanceBlocked(true);
+        await loadSessions();
+        return;
+      }
       setGlobalMessage(
         isKo
           ? `통화를 시작하지 못했습니다: ${describeApiError(error, join ? 'call_join' : 'call_start')}`
@@ -639,6 +646,30 @@ export default function ScreenSession() {
       : String(profile?.trialCallsRemaining ?? 0);
 
   const bannerTone = /failed|error|못했습니다|실패했습니다|필요합니다/i.test(globalMessage) ? 'danger' : 'neutral';
+
+  if (allowanceBlocked) {
+    return (
+      <AppShell
+        headerActions={
+          <>
+            <LanguagePicker />
+            <Button variant="outline" size="sm" onClick={() => navigate('/billing')}>
+              {t('nav.billing')}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={clearIdentity}>
+              {t('nav.signOut')}
+            </Button>
+          </>
+        }
+      >
+        <AllowanceGate
+          planCode={profile?.planCode}
+          isKo={isKo}
+          onGoToBilling={() => navigate('/billing')}
+        />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell
@@ -1011,6 +1042,39 @@ function LiveSessionCard({
   );
 }
 
+
+function AllowanceGate({
+  planCode,
+  isKo,
+  onGoToBilling
+}: {
+  planCode: string | undefined;
+  isKo: boolean;
+  onGoToBilling: () => void;
+}) {
+  const isFree = !planCode || planCode === 'free';
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center space-y-6">
+      <div className="space-y-2">
+        <p className="text-base font-semibold text-foreground">
+          {isFree
+            ? (isKo ? '체험 횟수를 모두 사용했어요' : 'Free trial sessions used up')
+            : (isKo ? '이번 달 세션이 끝났어요' : 'Monthly sessions used up')}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          {isFree
+            ? (isKo ? '구독하면 더 많은 세션을 이용할 수 있어요' : 'Subscribe to continue practicing')
+            : (isKo ? '다음 달 갱신일까지 기다리거나 Pro로 업그레이드하세요' : 'Wait for renewal or upgrade to Pro')}
+        </p>
+      </div>
+      <Button onClick={onGoToBilling}>
+        {isFree
+          ? (isKo ? '구독하기' : 'Subscribe')
+          : (isKo ? 'Pro로 업그레이드하기' : 'Upgrade to Pro')}
+      </Button>
+    </div>
+  );
+}
 
 function SessionRow({
   session,

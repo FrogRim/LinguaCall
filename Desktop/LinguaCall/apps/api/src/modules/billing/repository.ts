@@ -18,6 +18,7 @@ type DbPlanRow = {
   included_minutes: number;
   trial_calls: number;
   max_session_minutes: number;
+  monthly_session_limit: number;
   entitlements: string[];
   active: boolean;
   created_at: string;
@@ -61,6 +62,7 @@ const mapPlan = (row: DbPlanRow): BillingPlan => {
     includedMinutes: row.included_minutes,
     trialCalls: row.trial_calls,
     maxSessionMinutes: row.max_session_minutes,
+    monthlySessionLimit: row.monthly_session_limit ?? 0,
     entitlements: row.entitlements,
     active: row.active,
     createdAt: row.created_at,

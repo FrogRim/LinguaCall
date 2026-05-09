@@ -21,6 +21,8 @@ type DbUserRow = {
   paid_minutes_balance: number;
   plan_code: string;
   ui_language: string;
+  monthly_sessions_used: number;
+  plan_monthly_session_limit?: number;
   created_at: string;
   updated_at: string;
 };
@@ -45,6 +47,8 @@ const mapUserProfile = (row: DbUserRow): UserProfile => {
     paidMinutesBalance: row.paid_minutes_balance,
     planCode: row.plan_code,
     uiLanguage: row.ui_language,
+    monthlySessionsUsed: row.monthly_sessions_used ?? 0,
+    monthlySessionLimit: row.plan_monthly_session_limit ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };

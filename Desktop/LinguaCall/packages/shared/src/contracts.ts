@@ -41,6 +41,8 @@ export interface UserProfile {
   paidMinutesBalance: number;
   planCode: string;
   uiLanguage: string;
+  monthlySessionsUsed: number;
+  monthlySessionLimit: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -268,6 +270,7 @@ export interface BillingPlan {
   includedMinutes: number;
   trialCalls: number;
   maxSessionMinutes: number;
+  monthlySessionLimit: number;
   entitlements: unknown;
   active: boolean;
   createdAt: string;

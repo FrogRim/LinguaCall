@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import type { Report, TranscriptMessage, ReportEvaluatorGrammarCorrection } from '@lingua/shared';
+import type { Report, TranscriptMessage, ReportEvaluatorGrammarCorrection, UserProfile } from '@lingua/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -9,6 +9,7 @@ import { useUser } from '../context/UserContext';
 import { apiClient, describeApiError } from '../lib/api';
 import LanguagePicker from '../components/ui/LanguagePicker';
 import { buildHighlightSegments } from '../lib/highlightHelpers';
+import { getFriendlyCopy } from '../content/friendlyCopy';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000';
 
@@ -24,7 +25,19 @@ type PopoverEntry =
 
 const dictCache = new Map<string, DictEntry | null>();
 
+function getReportStatusLabel(status: string, isKo: boolean) {
+  const labels: Record<string, { ko: string; en: string }> = {
+    ready: { ko: '리포트 준비 완료', en: 'Report ready' },
+    pending: { ko: '리포트 생성 중', en: 'Report in progress' },
+    failed: { ko: '리포트 생성 실패', en: 'Report failed' }
+  };
+
+  const label = labels[status];
+  return label ? (isKo ? label.ko : label.en) : status.replace(/_/g, ' ');
+}
+
 function WordSpan({ word, lang }: { word: string; lang: string }) {
+  const { t } = useTranslation();
   const [popover, setPopover] = useState<PopoverEntry | null>(null);
   const spanRef = useRef<HTMLSpanElement>(null);
   const getToken = useContext(GetTokenContext);
@@ -73,8 +86,8 @@ function WordSpan({ word, lang }: { word: string; lang: string }) {
       </span>
       {popover && (
         <span className="absolute z-50 bottom-full left-0 mb-1 w-56 bg-card text-card-foreground border border-border rounded-md shadow-sm p-3 text-xs not-italic font-normal leading-relaxed">
-          {popover.status === 'loading' && <span className="text-muted-foreground">조회 중...</span>}
-          {popover.status === 'error' && <span className="text-destructive">조회 실패</span>}
+          {popover.status === 'loading' && <span className="text-muted-foreground">{t('common.loading')}</span>}
+          {popover.status === 'error' && <span className="text-destructive">{t('common.error')}</span>}
           {popover.status === 'ready' && (
             <span className="space-y-1 block">
               <span className="block text-muted-foreground uppercase tracking-wide font-medium text-[10px]">{popover.data.pos}</span>
@@ -138,7 +151,8 @@ function TranscriptBlock({
   corrections: ReportEvaluatorGrammarCorrection[];
   lang: string;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isKo = i18n.language.startsWith('ko');
   if (messages.length === 0) {
     return <p className="text-sm text-muted-foreground">{t('session.noTranscript')}</p>;
   }
@@ -150,7 +164,7 @@ function TranscriptBlock({
         return (
           <div key={i} className="space-y-0.5">
             <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              {isUser ? 'You' : 'AI'}
+              {isUser ? (isKo ? '나' : 'You') : 'AI'}
             </div>
             <p className="text-sm leading-relaxed text-foreground">
               {isUser ? (
@@ -166,16 +180,50 @@ function TranscriptBlock({
   );
 }
 
+// ── Paywall helpers ───────────────────────────────────────────────────────────
+
+function isReportLocked(planCode: string | undefined): boolean {
+  return !planCode || planCode === 'free';
+}
+
+function PaywallInlineSection({
+  title,
+  isKo,
+  onSubscribeClick
+}: {
+  title: string;
+  isKo: boolean;
+  onSubscribeClick: () => void;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-muted/40 p-4 space-y-3">
+      <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{title}</p>
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span>🔒</span>
+        <span>{isKo ? '구독 플랜에서 확인할 수 있어요' : 'Available with a subscription plan'}</span>
+      </div>
+      <button
+        onClick={onSubscribeClick}
+        className="text-xs font-medium text-primary underline underline-offset-2"
+      >
+        {isKo ? '구독하기' : 'Subscribe'}
+      </button>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function ScreenReport() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { reportId } = useParams<{ reportId: string }>();
   const navigate = useNavigate();
   const { getToken } = useUser();
+  const copy = getFriendlyCopy(i18n.language);
 
   const [report, setReport] = useState<Report | null>(null);
   const [messages, setMessages] = useState<TranscriptMessage[]>([]);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -184,8 +232,12 @@ export default function ScreenReport() {
     const api = apiClient(getToken);
     void (async () => {
       try {
-        const r = await api.get<Report>(`/reports/${decodeURIComponent(reportId)}`);
+        const [r, p] = await Promise.all([
+          api.get<Report>(`/reports/${decodeURIComponent(reportId)}`),
+          api.get<UserProfile>('/users/me').catch(() => null)
+        ]);
         setReport(r);
+        setProfile(p);
         try {
           const msgRes = await api.get<{ sessionId: string; messages: TranscriptMessage[] }>(
             `/sessions/${r.sessionId}/messages?limit=200`
@@ -216,8 +268,9 @@ export default function ScreenReport() {
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle>{t('report.title')}</CardTitle>
+          <CardHeader className="space-y-1 pb-3">
+            <CardTitle>{copy.report.title}</CardTitle>
+            <p className="text-sm leading-6 text-muted-foreground">{copy.report.description}</p>
           </CardHeader>
           <CardContent>
             {loading && <p className="text-sm text-muted-foreground">{t('report.loading')}</p>}
@@ -226,7 +279,7 @@ export default function ScreenReport() {
             )}
             {report && (
               <GetTokenContext.Provider value={getToken}>
-                <ReportView report={report} messages={messages} />
+                <ReportView report={report} messages={messages} planCode={profile?.planCode} />
               </GetTokenContext.Provider>
             )}
           </CardContent>
@@ -238,8 +291,11 @@ export default function ScreenReport() {
 
 // ── Report View — section order: summary → corrections → transcript → recommendations ──
 
-function ReportView({ report, messages }: { report: Report; messages: TranscriptMessage[] }) {
-  const { t } = useTranslation();
+function ReportView({ report, messages, planCode }: { report: Report; messages: TranscriptMessage[]; planCode?: string }) {
+  const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
+  const isKo = i18n.language.startsWith('ko');
+  const locked = isReportLocked(planCode);
   const ev = report.evaluation;
   const corrections = ev?.grammarCorrections ?? [];
   const vocabulary = ev?.vocabularyAnalysis ?? [];
@@ -252,7 +308,7 @@ function ReportView({ report, messages }: { report: Report; messages: Transcript
       {/* Status */}
       <div className="flex items-center gap-2">
         <Badge variant={report.status === 'ready' ? 'default' : 'secondary'}>
-          {report.status}
+          {getReportStatusLabel(report.status, isKo)}
         </Badge>
         {report.status === 'failed' && (
           <span className="text-destructive text-xs">{t('report.generationFailed')}</span>
@@ -297,7 +353,13 @@ function ReportView({ report, messages }: { report: Report; messages: Transcript
       )}
 
       {/* 3. Grammar Corrections */}
-      {corrections.length > 0 && (
+      {locked ? (
+        <PaywallInlineSection
+          title={t('report.grammarCorrections')}
+          isKo={isKo}
+          onSubscribeClick={() => navigate('/billing')}
+        />
+      ) : corrections.length > 0 && (
         <div>
           <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-3">
             {t('report.grammarCorrections')}
@@ -328,7 +390,13 @@ function ReportView({ report, messages }: { report: Report; messages: Transcript
       )}
 
       {/* 5. Recommendations */}
-      {report.recommendations && report.recommendations.length > 0 && (
+      {locked ? (
+        <PaywallInlineSection
+          title={t('report.recommendations')}
+          isKo={isKo}
+          onSubscribeClick={() => navigate('/billing')}
+        />
+      ) : report.recommendations && report.recommendations.length > 0 && (
         <div>
           <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-2">
             {t('report.recommendations')}
