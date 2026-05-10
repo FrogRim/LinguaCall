@@ -7,6 +7,8 @@ import {
   ReportStatus
 } from "./enums";
 
+export type SessionMode = "practice" | "mock" | "real";
+
 export type ApiErrorCode =
   | "validation_error"
   | "conflict"
@@ -72,7 +74,7 @@ export interface Session {
   accuracyState?: SessionAccuracyState;
   reservedTrialCall?: boolean;
   reservedMinutes?: number;
-  sessionMode: string;
+  sessionMode: SessionMode;
   createdAt: string;
   updatedAt: string;
 }
@@ -117,7 +119,7 @@ export interface CreateSessionPayload {
   contactMode: ContactMode;
   scheduledForAtUtc?: string;
   timezone?: string;
-  sessionMode?: 'practice' | 'mock' | 'real';
+  sessionMode?: SessionMode;
 }
 
 export interface StartCallPayload {
