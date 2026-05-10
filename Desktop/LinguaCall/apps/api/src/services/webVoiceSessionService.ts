@@ -6,7 +6,7 @@ import {
 } from "@lingua/shared";
 import { store, AppError } from "../storage/inMemoryStore";
 import { createOpenAIRealtimeSession } from "./openaiRealtime";
-import { buildSessionAccuracyPolicy } from "./sessionAccuracy";
+import { applyModeOverrides, buildSessionAccuracyPolicy } from "./sessionAccuracy";
 
 const buildStartResponse = async (
   sessionId: string,
@@ -66,7 +66,10 @@ export const startWebVoiceSession = async (
 ): Promise<StartCallResponse> => {
   const bootstrap = await store.startWebVoiceCall(sessionId, clerkUserId, idempotencyKey);
   try {
-    const accuracyPolicy = buildSessionAccuracyPolicy(bootstrap.session);
+    const accuracyPolicy = applyModeOverrides(
+      buildSessionAccuracyPolicy(bootstrap.session),
+      bootstrap.session.sessionMode ?? "mock"
+    );
     return await buildStartResponse(
       bootstrap.session.id,
       clerkUserId,
@@ -92,7 +95,10 @@ export const joinWebVoiceSession = async (
 ): Promise<StartCallResponse> => {
   const bootstrap = await store.joinWebVoiceCall(sessionId, clerkUserId, idempotencyKey);
   try {
-    const accuracyPolicy = buildSessionAccuracyPolicy(bootstrap.session);
+    const accuracyPolicy = applyModeOverrides(
+      buildSessionAccuracyPolicy(bootstrap.session),
+      bootstrap.session.sessionMode ?? "mock"
+    );
     return await buildStartResponse(
       bootstrap.session.id,
       clerkUserId,

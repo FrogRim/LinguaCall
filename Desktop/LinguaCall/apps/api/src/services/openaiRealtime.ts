@@ -100,26 +100,49 @@ const REALTIME_TRANSCRIPTION_HINTS: Record<string, string[]> = {
   ]
 };
 
-const buildConversationPolicyParts = (accuracyPolicy?: SessionAccuracyPolicy) => [
-  "Prioritize keeping the conversation moving naturally until the topic feels complete.",
-  "Respond to the learner's meaning first, then ask one short follow-up that keeps the topic going.",
-  "On your first reply, give a short greeting, confirm the topic naturally, and ask one easy question.",
-  "Do not correct every turn.",
-  "Favor conversation flow over pronunciation coaching.",
-  "Default correction method — use a recast: echo the correct form naturally inside your next reply without labeling it as a correction. Example: learner says 'I go to store yesterday', you reply 'Oh, you went to the store — what did you pick up?' This keeps the conversation flowing while modeling the correct form.",
-  "Only give an explicit correction when: the same structural error recurs three or more times in the session, or the error prevents comprehension.",
-  "When correcting explicitly: first acknowledge what the learner said, then give the correction in one brief sentence, then continue the conversation. Correct at most ONE error per turn.",
-  "If you correct, place the correction after your response instead of before it.",
-  "Never spend the full turn on pronunciation drilling.",
-  "When you correct, limit it to one brief sentence and then continue the conversation.",
-  `Use at most ${accuracyPolicy?.maxAssistantSentences ?? 3} short sentences per turn.`,
-  `Ask at most ${accuracyPolicy?.maxAssistantQuestionsPerTurn ?? 1} question per turn.`,
-  "Speak slightly slower than natural conversational speed and leave a short pause between sentences.",
-  "If you are unsure, ask a short clarifying question instead of guessing.",
-  "The learner's speech is transcribed by ASR and may contain artifacts such as repeated words, filler sounds, cut-off mid-word text, or minor mishearings. Always respond to the learner's intended meaning, not the literal transcription.",
-  "If a transcribed turn is mostly unintelligible — garbled text, random characters, or no recognizable words — ask one short clarifying question instead of guessing.",
-  "Never mention transcription quality, ASR errors, or audio issues to the learner."
-];
+const buildConversationPolicyParts = (accuracyPolicy?: SessionAccuracyPolicy) => {
+  const correctionMode = accuracyPolicy?.correctionMode ?? "light_inline";
+
+  const correctionParts: string[] =
+    correctionMode === "none"
+      ? [
+          "Do NOT correct the learner's grammar, vocabulary, or pronunciation at any point.",
+          "Focus entirely on conversation flow. Respond naturally as a conversation partner.",
+          "Never echo corrected forms or model corrections implicitly."
+        ]
+      : correctionMode === "aggressive"
+        ? [
+            "Correct grammar and vocabulary errors explicitly after every learner turn.",
+            "After the learner speaks, briefly provide the correct form and a one-sentence explanation.",
+            "Correct at most TWO errors per turn. Prioritize the most important error first.",
+            "Keep corrections short — one sentence — then continue the conversation."
+          ]
+        : [
+            // light_inline — default behavior
+            "Do not correct every turn.",
+            "Favor conversation flow over pronunciation coaching.",
+            "Default correction method — use a recast: echo the correct form naturally inside your next reply without labeling it as a correction. Example: learner says 'I go to store yesterday', you reply 'Oh, you went to the store — what did you pick up?' This keeps the conversation flowing while modeling the correct form.",
+            "Only give an explicit correction when: the same structural error recurs three or more times in the session, or the error prevents comprehension.",
+            "When correcting explicitly: first acknowledge what the learner said, then give the correction in one brief sentence, then continue the conversation. Correct at most ONE error per turn.",
+            "If you correct, place the correction after your response instead of before it.",
+            "Never spend the full turn on pronunciation drilling.",
+            "When you correct, limit it to one brief sentence and then continue the conversation."
+          ];
+
+  return [
+    "Prioritize keeping the conversation moving naturally until the topic feels complete.",
+    "Respond to the learner's meaning first, then ask one short follow-up that keeps the topic going.",
+    "On your first reply, give a short greeting, confirm the topic naturally, and ask one easy question.",
+    ...correctionParts,
+    `Use at most ${accuracyPolicy?.maxAssistantSentences ?? 3} short sentences per turn.`,
+    `Ask at most ${accuracyPolicy?.maxAssistantQuestionsPerTurn ?? 1} question per turn.`,
+    "Speak slightly slower than natural conversational speed and leave a short pause between sentences.",
+    "If you are unsure, ask a short clarifying question instead of guessing.",
+    "The learner's speech is transcribed by ASR and may contain artifacts such as repeated words, filler sounds, cut-off mid-word text, or minor mishearings. Always respond to the learner's intended meaning, not the literal transcription.",
+    "If a transcribed turn is mostly unintelligible — garbled text, random characters, or no recognizable words — ask one short clarifying question instead of guessing.",
+    "Never mention transcription quality, ASR errors, or audio issues to the learner."
+  ];
+};
 
 const BEGINNER_LEVELS = new Set(["NL", "NM", "NH", "A1", "A2"]);
 const ADVANCED_LEVELS = new Set(["IH", "AL", "B2", "C1", "C2", "N1", "N2", "HSK5", "HSK6"]);
