@@ -33,7 +33,8 @@ const CreateSessionSchema = z.object({
   durationMinutes: z.number().int().min(1),
   contactMode: z.enum(["immediate", "scheduled_once"]),
   timezone: z.string().optional(),
-  scheduledForAtUtc: z.string().optional()
+  scheduledForAtUtc: z.string().optional(),
+  sessionMode: z.enum(['practice', 'mock', 'real']).optional().default('mock')
 }).refine(
   (data) => data.contactMode !== "scheduled_once" || !!data.scheduledForAtUtc,
   { message: "scheduledForAtUtc is required for scheduled_once", path: ["scheduledForAtUtc"] }
@@ -56,7 +57,8 @@ router.post("/", requireAuthenticatedUser, async (req: AuthenticatedRequest, res
       durationMinutes: payload.durationMinutes,
       contactMode: payload.contactMode,
       timezone: payload.timezone,
-      scheduledForAtUtc: payload.scheduledForAtUtc
+      scheduledForAtUtc: payload.scheduledForAtUtc,
+      sessionMode: payload.sessionMode
     });
     res.status(201).json({ ok: true, data: session });
   } catch (err) {
