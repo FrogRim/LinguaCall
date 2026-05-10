@@ -1,6 +1,6 @@
 # LinguaCall Handoff
 
-Last updated: 2026-04-26
+Last updated: 2026-05-10
 
 ## Current state
 
@@ -17,9 +17,7 @@ Production stack is running on a VPS with Docker Compose.
 Commit: `5f73fef` (billing return handling hardening)
 
 Latest production changes:
-- billing success/cancel/return copy polished for launch
-- web billing now stays informational while Apps in Toss is the primary payment entry path
-- browser-side checkout/confirm is no longer the primary release flow
+- billing UI runs real checkout again: Toss Payments widget on `platform === web`, Apps in Toss native handoff (`startAppsInTossBillingLaunch`) when payment bridge exists
 - Supabase migrations applied:
   - `20260424_pending_billing_checkouts.sql`
   - `20260425_pending_billing_checkout_claim.sql`
@@ -29,7 +27,7 @@ All Phase 1–6 UX features are in production:
 | Phase | Feature | Status |
 |-------|---------|--------|
 | 1 | PTT (Push-to-Talk) | ✅ |
-| 2 | Stage/situation setup | ⏳ pending |
+| 2 | Session mode (준비/모의/실전) | ⚙️ 구현 완료, 미배포 — DB 마이그레이션 적용 필요 |
 | 3 | Early exit keyword detection | ✅ |
 | 4 | Session delete (terminal sessions) | ✅ |
 | 5 | Report transcript highlighting | ✅ |
@@ -88,10 +86,11 @@ docker compose --env-file infra/.env.production -f infra/docker-compose.yml up -
 
 ## Next work
 
-- Phase 2: stage/situation 선택 UI (준비/모의/실전 + 언어별 프리셋)
+- Phase 2: stage/situation 선택 UI (준비/모의/실전 + 언어별 프리셋) — **session_mode 컬럼 추가 완료, UI 완료. Supabase SQL Editor에서 마이그레이션 실행 필요: `packages/db/migrations/20260510_session_mode.sql`**
 - `/billing/apps-in-toss/payment-launch`는 최근 `/billing/apps-in-toss/verify-session` 성공 이력이 있어야만 열림. 현재 구현은 `appLogin`으로 받은 `authorizationCode`/`referrer`를 서버에서 교환해 짧은 TTL 세션으로 검증함
 - Apps in Toss 운영 전환 시 `APPS_IN_TOSS_PARTNER_API_KEY`, `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `VITE_TOSS_CLIENT_KEY`를 모두 live 값으로 교체 후 `web`/`api` 재빌드
 - 운영 키 전환 후 Apps in Toss 내부에서 소액 실결제 1건으로 launch → webhook → 구독 반영까지 다시 확인
+- **[미배포] AppInToss 월 세션 한도 마이그레이션 적용 필요** — 아래 섹션 참고
 
 ## 웹 Toss Payments 결제 — 구현 완료, 리디렉션만 비활성화 상태
 
@@ -158,6 +157,86 @@ docker compose --env-file infra/.env.production -f infra/docker-compose.yml up -
    ```
 
 3. `web`, `api` 이미지 재빌드 후 배포.
+
+## Session Mode (준비/모의/실전) — 구현 완료, 미배포 (2026-05-10)
+
+### 개요
+
+세션 생성 폼에 학습 모드 선택(준비/모의/실전)을 추가했다. 모드에 따라 AI 교정 강도와 페르소나가 다르게 적용되며, `sessions.session_mode` 컬럼에 저장된다.
+
+| 모드 | correctionMode | maxSentences | topicLock | AI 페르소나 |
+|------|---------------|-------------|-----------|-----------|
+| 준비 (practice) | aggressive | 4 | true | 친절, 설명 위주 |
+| 모의 (mock, 기본값) | light_inline | 3 | true | 시험관 |
+| 실전 (real) | none | 2 | false | 대화 흐름 최우선 |
+
+### 배포 전 반드시 적용
+
+```bash
+psql $DATABASE_URL -f packages/db/migrations/20260510_session_mode.sql
+```
+
+또는 Supabase SQL Editor에서 해당 파일 내용 실행.
+
+### 변경된 파일
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `packages/db/migrations/20260510_session_mode.sql` | 신규 마이그레이션 |
+| `packages/shared/src/contracts.ts` | `SessionMode` 타입, `Session.sessionMode`, `CreateSessionPayload.sessionMode`, `correctionMode` 유니온 확장 |
+| `apps/api/src/services/sessionAccuracy.ts` | `applyModeOverrides` 함수 추가 |
+| `apps/api/src/services/openaiRealtime.ts` | `buildConversationPolicyParts` 교정 모드 분기 |
+| `apps/api/src/services/webVoiceSessionService.ts` | `applyModeOverrides` 적용 |
+| `apps/api/src/storage/inMemoryStore.ts` | `DbSessionRow.session_mode`, `mapSession`, `createSession` INSERT, `startWebVoiceCall` |
+| `apps/api/src/routes/sessions.ts` | Zod 스키마에 `sessionMode` 추가 |
+| `apps/web/src/pages/ScreenSession.tsx` | 폼 하단 모드 셀렉트 + 카드 뱃지 |
+| `apps/web/src/i18n/locales/ko.json`, `en.json` | `learningMode*` 키 추가 |
+
+---
+
+## AppInToss 월 세션 한도 과금 — 구현 완료, 미배포 (2026-05-10)
+
+### 개요
+
+AppInToss 플랫폼용 세션 횟수 기반 과금 모델을 추가했다. 기존 `paid_minutes_balance` (분 단위 풀) 로직은 그대로 유지하고, `monthly_session_limit > 0`인 플랜에서는 새 분기가 우선 적용된다.
+
+### 플랜 구조
+
+| 플랜 | 가격 | 세션 시간 | 월 한도 |
+|------|------|----------|---------|
+| free | 무료 | 3분 | 평생 3회 (trialCalls) |
+| basic | ₩7,900 | 5분 | 월 10회 |
+| pro | ₩15,900 | 15분 | 월 12회 |
+
+### 마이그레이션 — 배포 전 반드시 적용
+
+```bash
+psql $DATABASE_URL -f packages/db/migrations/20260510_appintoss_session_limits.sql
+```
+
+이 마이그레이션이 하는 일:
+- `plans` 테이블에 `monthly_session_limit INTEGER NOT NULL DEFAULT 0` 추가
+- `users` 테이블에 `monthly_sessions_used INTEGER NOT NULL DEFAULT 0`, `monthly_period_start DATE` 추가
+- `sessions` 테이블에 `reserved_monthly_session BOOLEAN NOT NULL DEFAULT false` 추가
+- free / basic / pro 플랜 upsert
+
+### 변경된 파일
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `packages/db/migrations/20260510_appintoss_session_limits.sql` | 신규 마이그레이션 |
+| `packages/shared/src/contracts.ts` | `UserProfile`에 `monthlySessionsUsed`, `monthlySessionLimit` 추가; `BillingPlan`에 `monthlySessionLimit` 추가 |
+| `apps/api/src/storage/inMemoryStore.ts` | `startWebVoiceCall` 월 세션 분기, lazy 기간 리셋, `failWebVoiceBootstrap` 슬롯 환불 |
+| `apps/api/src/modules/billing/repository.ts` | `mapPlan`에 `monthlySessionLimit` 추가 |
+| `apps/api/src/modules/users/repository.ts` | `mapUserProfile`에 `monthlySessionsUsed`, `monthlySessionLimit` 추가 |
+| `apps/web/src/pages/ScreenReport.tsx` | 무료 플랜 페이월 (문법 교정, 추천 사항 잠금) |
+| `apps/web/src/pages/ScreenSession.tsx` | `AllowanceGate` — `insufficient_allowance` 에러 시 업그레이드 안내 화면 |
+| `apps/web/src/pages/ScreenBilling.tsx` | `formatPlanFeatures`로 세션 횟수 모델 표기 |
+
+### 알려진 제약
+
+- `monthly_period_start` 리셋은 lazy evaluation (다음 세션 시작 시점에 평가). 월초에 카운터가 즉시 초기화되지 않음 — UX상 허용 범위.
+- basic/pro 유저가 한도 초과 시 `insufficient_allowance` 에러 반환 → 프론트에서 `AllowanceGate`로 처리.
 
 ## AppInToss 분리 빌드 — 구현 완료 (2026-04-26)
 
