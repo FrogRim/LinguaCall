@@ -17,10 +17,13 @@ const baseMockPolicy: SessionAccuracyPolicy = {
 
 describe('applyModeOverrides', () => {
   it('practice: sets aggressive correction and maxSentences=4', () => {
-    const result = applyModeOverrides(baseMockPolicy, 'practice');
+    const base = { ...baseMockPolicy, enforceTopicRetention: false, maxAssistantQuestionsPerTurn: 2 };
+    const result = applyModeOverrides(base, 'practice');
     expect(result.correctionMode).toBe('aggressive');
     expect(result.maxAssistantSentences).toBe(4);
+    expect(result.maxAssistantQuestionsPerTurn).toBe(1);
     expect(result.enforceTopicRetention).toBe(true);
+    expect(result.explicitTopicSwitchRequired).toBe(base.explicitTopicSwitchRequired);
   });
 
   it('real: disables correction and topicLock', () => {

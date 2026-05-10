@@ -231,7 +231,7 @@ export const toAccuracyState = (result: AccuracyValidationResult): SessionAccura
 
 export const applyModeOverrides = (policy: SessionAccuracyPolicy, mode: string): SessionAccuracyPolicy => {
   if (mode === 'practice') {
-    return { ...policy, correctionMode: 'aggressive', maxAssistantSentences: 4, enforceTopicRetention: true };
+    return { ...policy, correctionMode: 'aggressive', maxAssistantSentences: 4, maxAssistantQuestionsPerTurn: 1, enforceTopicRetention: true };
   }
   if (mode === 'real') {
     return {
