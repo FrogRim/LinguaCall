@@ -41,20 +41,20 @@ const overlapScore = (left: Set<string>, right: Set<string>): number => {
 
 const DEFAULT_FORBIDDEN_BY_TOPIC: Array<{ match: string[]; hints: string[] }> = [
   {
-    match: ["hospital", "doctor", "clinic", "symptom", "medicine", "krankenhaus", "arzt", "klinik", "sintoma", "sintoma", "medico", "medico", "?ßæ", "?êÂ", "ñø?"],
-    hints: ["bank", "loan", "mortgage", "account", "investment", "kredit", "konto", "banco", "prestamo", "prestamo", "cuenta", "?ú¼", "?Î³", "??"]
+    match: ["hospital", "doctor", "clinic", "symptom", "medicine", "krankenhaus", "arzt", "klinik", "sintoma", "sintoma", "medico", "medico", "?ï¿½ï¿½", "?ï¿½ï¿½", "ï¿½ï¿½?"],
+    hints: ["bank", "loan", "mortgage", "account", "investment", "kredit", "konto", "banco", "prestamo", "prestamo", "cuenta", "?ï¿½ï¿½", "?Î³", "??"]
   },
   {
-    match: ["bank", "finance", "loan", "account", "money", "kredit", "konto", "banco", "prestamo", "prestamo", "cuenta", "?ú¼", "?Î³", "??"],
-    hints: ["hospital", "doctor", "clinic", "symptom", "medicine", "krankenhaus", "arzt", "klinik", "sintoma", "sintoma", "medico", "medico", "?ßæ", "?êÂ", "ñø?"]
+    match: ["bank", "finance", "loan", "account", "money", "kredit", "konto", "banco", "prestamo", "prestamo", "cuenta", "?ï¿½ï¿½", "?Î³", "??"],
+    hints: ["hospital", "doctor", "clinic", "symptom", "medicine", "krankenhaus", "arzt", "klinik", "sintoma", "sintoma", "medico", "medico", "?ï¿½ï¿½", "?ï¿½ï¿½", "ï¿½ï¿½?"]
   },
   {
-    match: ["interview", "job", "career", "resume", "bewerbung", "vorstellungsgesprach", "vorstellungsgesprach", "entrevista", "trabajo", "Øü?", "ÍïíÂ"],
-    hints: ["hospital", "clinic", "symptom", "surgery", "krankenhaus", "klinik", "cirugia", "cirugia", "?êÂ", "â¢?"]
+    match: ["interview", "job", "career", "resume", "bewerbung", "vorstellungsgesprach", "vorstellungsgesprach", "entrevista", "trabajo", "ï¿½ï¿½?", "ï¿½ï¿½ï¿½ï¿½"],
+    hints: ["hospital", "clinic", "symptom", "surgery", "krankenhaus", "klinik", "cirugia", "cirugia", "?ï¿½ï¿½", "ï¿½?"]
   },
   {
-    match: ["travel", "trip", "airport", "hotel", "reise", "flughafen", "viaje", "aeropuerto", "Õéú¼", "Ïõ?", "ñÐïÁ"],
-    hints: ["mortgage", "loan", "investment", "surgery", "hypothek", "kredit", "investition", "prestamo", "prestamo", "inversion", "inversion", "?Î³", "÷á?", "â¢?"]
+    match: ["travel", "trip", "airport", "hotel", "reise", "flughafen", "viaje", "aeropuerto", "ï¿½ï¿½ï¿½ï¿½", "ï¿½ï¿½?", "ï¿½ï¿½ï¿½ï¿½"],
+    hints: ["mortgage", "loan", "investment", "surgery", "hypothek", "kredit", "investition", "prestamo", "prestamo", "inversion", "inversion", "?Î³", "ï¿½ï¿½?", "ï¿½?"]
   }
 ];
 
@@ -75,9 +75,9 @@ const CORRECTION_HINTS = [
   "mas natural",
   "mejor seria",
   "mejor seria",
-  "?Ê¦ì¤?",
-  "ÌÚí»æÔîÜ?Ûö",
-  "ÌÚû¿îÜøú?"
+  "?Ê¦ï¿½?",
+  "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½?ï¿½ï¿½",
+  "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½?"
 ];
 
 export const buildSessionAccuracyPolicy = (session: Pick<Session, "language" | "exam" | "topic">): SessionAccuracyPolicy => {
@@ -228,3 +228,20 @@ export const validateCompletedTranscript = (
 
 export const toAccuracyState = (result: AccuracyValidationResult): SessionAccuracyState =>
   buildAccuracyState(result);
+
+export const applyModeOverrides = (policy: SessionAccuracyPolicy, mode: string): SessionAccuracyPolicy => {
+  if (mode === 'practice') {
+    return { ...policy, correctionMode: 'aggressive', maxAssistantSentences: 4, enforceTopicRetention: true };
+  }
+  if (mode === 'real') {
+    return {
+      ...policy,
+      correctionMode: 'none',
+      maxAssistantSentences: 2,
+      maxAssistantQuestionsPerTurn: 1,
+      enforceTopicRetention: false,
+      topicLockEnabled: false
+    };
+  }
+  return policy;
+};
