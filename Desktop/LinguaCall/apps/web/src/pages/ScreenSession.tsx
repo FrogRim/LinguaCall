@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type {
   Session,
+  SessionMode,
   BillingPlan,
   UserProfile,
   UserSubscription,
@@ -233,6 +234,7 @@ export default function ScreenSession() {
   const [topic, setTopic] = useState('daily conversation');
   const [duration, setDuration] = useState(10);
   const [scheduledFor, setScheduledFor] = useState('');
+  const [sessionMode, setSessionMode] = useState<SessionMode>('mock');
   const [durationOptions, setDurationOptions] = useState([10]);
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
@@ -469,7 +471,8 @@ export default function ScreenSession() {
           mode === 'scheduled_once' && scheduledFor
             ? new Date(scheduledFor).toISOString()
             : undefined,
-        timezone: 'Asia/Seoul'
+        timezone: 'Asia/Seoul',
+        sessionMode
       };
       const session = await api.post<Session>('/sessions', payload);
       setDetail({ kind: 'idle' });
@@ -845,6 +848,20 @@ export default function ScreenSession() {
                   )}
                 </div>
 
+                <div className="space-y-2">
+                  <Label>{t('session.learningMode')}</Label>
+                  <Select value={sessionMode} onValueChange={value => setSessionMode(value as SessionMode)}>
+                    <SelectTrigger className="rounded-2xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="practice">{t('session.learningModePractice')}</SelectItem>
+                      <SelectItem value="mock">{t('session.learningModeMock')}</SelectItem>
+                      <SelectItem value="real">{t('session.learningModeReal')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {formError && <StatusBanner tone="danger">{formError}</StatusBanner>}
 
                 <div className="flex flex-wrap gap-3">
@@ -1114,6 +1131,13 @@ function SessionRow({
               {getSessionStatusLabel(session.status, isKo)}
             </Badge>
             <Badge variant="outline">{getContactModeLabel(session.contactMode, isKo)}</Badge>
+            {session.sessionMode && session.sessionMode !== 'mock' && (
+              <Badge variant="secondary">
+                {session.sessionMode === 'practice'
+                  ? t('session.learningModePractice')
+                  : t('session.learningModeReal')}
+              </Badge>
+            )}
             {session.reportStatus === 'pending' && (
               <Badge variant="secondary">{isKo ? '리포트 생성 중' : 'Report in progress'}</Badge>
             )}
