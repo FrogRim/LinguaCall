@@ -72,6 +72,7 @@ export interface Session {
   accuracyState?: SessionAccuracyState;
   reservedTrialCall?: boolean;
   reservedMinutes?: number;
+  sessionMode: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -79,7 +80,7 @@ export interface Session {
 export interface SessionAccuracyPolicy {
   topicLockEnabled: boolean;
   explicitTopicSwitchRequired: boolean;
-  correctionMode: "light_inline";
+  correctionMode: "light_inline" | "aggressive" | "none";
   maxAssistantSentences: number;
   maxAssistantQuestionsPerTurn: number;
   enforceTopicRetention: boolean;
@@ -116,6 +117,7 @@ export interface CreateSessionPayload {
   contactMode: ContactMode;
   scheduledForAtUtc?: string;
   timezone?: string;
+  sessionMode?: 'practice' | 'mock' | 'real';
 }
 
 export interface StartCallPayload {
