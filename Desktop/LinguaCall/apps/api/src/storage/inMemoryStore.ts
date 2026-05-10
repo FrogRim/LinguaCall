@@ -44,6 +44,7 @@ import {
   isTwilioCompletedPlatformFault
 } from "../callFaultClassifier";
 import {
+  applyModeOverrides,
   buildSessionAccuracyPolicy,
   toAccuracyState,
   validateCompletedTranscript
@@ -98,6 +99,7 @@ interface DbSessionRow {
   reserved_trial_call: boolean;
   reserved_minutes: number;
   reserved_monthly_session: boolean;
+  session_mode: string;
   provider_call_sid: string | null;
   last_provider_sequence_number: number;
   created_at: string;
@@ -447,6 +449,7 @@ class InMemoryStore {
       accuracyState,
       reservedTrialCall: row.reserved_trial_call,
       reservedMinutes: row.reserved_minutes,
+      sessionMode: (row.session_mode ?? "mock") as import("@lingua/shared").SessionMode,
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
@@ -1264,7 +1267,8 @@ class InMemoryStore {
       durationMinutes,
       contactMode,
       scheduledForAtUtc,
-      timezone
+      timezone,
+      sessionMode
     } = payload;
 
     if (!isLanguageExamLocked(language, exam)) {
@@ -1371,13 +1375,14 @@ class InMemoryStore {
             reminder_sent_at,
             reserved_trial_call,
             reserved_minutes,
+            session_mode,
             config_snapshot,
             model_config,
             report_status,
             created_at,
             updated_at
           ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, '{}'::jsonb, '{}'::jsonb, 'not_requested', NOW(), NOW()
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, '{}'::jsonb, '{}'::jsonb, 'not_requested', NOW(), NOW()
           )
           RETURNING *
         `,
@@ -1398,7 +1403,8 @@ class InMemoryStore {
           false,
           null,
           reservedTrialCall,
-          reservedMinutes
+          reservedMinutes,
+          sessionMode ?? "mock"   // $18
         ]
       );
 
@@ -2558,6 +2564,7 @@ class InMemoryStore {
       reportStatus: "ready",
       reservedTrialCall: false,
       reservedMinutes: 0,
+      sessionMode: "mock" as import("@lingua/shared").SessionMode,
       createdAt: nowIso(),
       updatedAt: nowIso()
     };
@@ -2950,7 +2957,10 @@ class InMemoryStore {
       const callId = sessionRow.call_id ?? `WV_${randomUUID().replace(/-/g, "").slice(0, 18)}`;
       const accuracyPolicy =
         (asObject(sessionRow.accuracy_policy) as unknown as SessionAccuracyPolicy | undefined) ??
-        buildSessionAccuracyPolicy(this.mapSession(sessionRow));
+        applyModeOverrides(
+          buildSessionAccuracyPolicy(this.mapSession(sessionRow)),
+          sessionRow.session_mode ?? "mock"
+        );
       const updated = await client.query<DbSessionRow>(
         `
           UPDATE sessions
