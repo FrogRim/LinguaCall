@@ -34,7 +34,7 @@ const CreateSessionSchema = z.object({
   contactMode: z.enum(["immediate", "scheduled_once"]),
   timezone: z.string().optional(),
   scheduledForAtUtc: z.string().optional(),
-  sessionMode: z.enum(['practice', 'mock', 'real']).optional().default('mock')
+  sessionMode: z.enum(["practice", "mock", "real"]).optional().default("mock")
 }).refine(
   (data) => data.contactMode !== "scheduled_once" || !!data.scheduledForAtUtc,
   { message: "scheduledForAtUtc is required for scheduled_once", path: ["scheduledForAtUtc"] }
