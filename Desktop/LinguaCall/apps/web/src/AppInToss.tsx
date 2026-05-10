@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { AppsInTossAuthProvider, useAppsInTossAuth } from './lib/appsInTossAuth';
 import { UserContext, type UserContextValue } from './context/UserContext';
 import { getCachedUiLanguage, setCachedUiLanguage } from './i18n/index';
+import { ColorSchemeArea } from '@toss/tds-mobile';
+import { AppInTossNavBar } from './components/layout/AppInTossNavBar';
 import ScreenSession from './pages/ScreenSession';
 import ScreenBilling from './pages/ScreenBilling';
 import ScreenReport from './pages/ScreenReport';
@@ -58,20 +60,25 @@ function AppInTossRoutes() {
     );
   }
 
-  return React.createElement(
-    AppInTossUserProvider,
-    null,
-    React.createElement(
-      Routes,
-      null,
-      React.createElement(Route, { path: '/', element: React.createElement(Navigate, { to: '/session', replace: true }) }),
-      React.createElement(Route, { path: '/session', element: React.createElement(ScreenSession) }),
-      React.createElement(Route, { path: '/billing', element: React.createElement(ScreenBilling) }),
-      React.createElement(Route, { path: '/report/:reportId', element: React.createElement(ScreenReport) }),
-      React.createElement(Route, { path: '/privacy', element: React.createElement(ScreenPrivacy) }),
-      React.createElement(Route, { path: '/terms', element: React.createElement(ScreenTerms) }),
-      React.createElement(Route, { path: '*', element: React.createElement(Navigate, { to: '/session', replace: true }) })
-    )
+  return (
+    <AppInTossUserProvider>
+      <ColorSchemeArea theme="light">
+        <div className="flex min-h-screen flex-col">
+          <AppInTossNavBar />
+          <div className="flex-1">
+            <Routes>
+            <Route path="/" element={<Navigate to="/session" replace />} />
+            <Route path="/session" element={<ScreenSession />} />
+            <Route path="/billing" element={<ScreenBilling />} />
+            <Route path="/report/:reportId" element={<ScreenReport />} />
+            <Route path="/privacy" element={<ScreenPrivacy />} />
+            <Route path="/terms" element={<ScreenTerms />} />
+            <Route path="*" element={<Navigate to="/session" replace />} />
+          </Routes>
+        </div>
+      </div>
+      </ColorSchemeArea>
+    </AppInTossUserProvider>
   );
 }
 

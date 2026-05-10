@@ -33,17 +33,14 @@ export default function ScreenLogin() {
       sidebarCopy={copy.login.valueSummary}
       sidebarPoints={copy.login.bullets}
     >
-      <div className="space-y-8 px-8 py-8 sm:px-10 sm:py-10">
-        <div className="space-y-3">
+      <div className="space-y-7 px-8 py-8 sm:px-10 sm:py-10">
+        <div className="space-y-2">
           <div className="inline-flex rounded-full border border-border bg-secondary px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             LinguaCall
           </div>
           <h2 className="text-3xl font-semibold tracking-tight text-foreground">
             {copy.common.quickPractice}
           </h2>
-          <p className="text-sm leading-6 text-muted-foreground">
-            {copy.login.description}
-          </p>
         </div>
 
         <div className="grid gap-3">
@@ -62,12 +59,8 @@ export default function ScreenLogin() {
           </Button>
         </div>
 
-        <div className="grid gap-3 rounded-xl border border-border bg-secondary p-4">
-          {copy.login.bullets.map(point => (
-            <div key={point} className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-foreground">
-              {point}
-            </div>
-          ))}
+        <div className="rounded-xl border border-border bg-secondary px-4 py-3 text-sm leading-6 text-muted-foreground">
+          {copy.login.valueSummary}
         </div>
       </div>
     </AuthLayout>

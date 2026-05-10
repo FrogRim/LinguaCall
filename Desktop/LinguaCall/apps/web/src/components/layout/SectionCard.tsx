@@ -19,11 +19,11 @@ export function SectionCard({
 }) {
   return (
     <Card className={cn('rounded-2xl border-border bg-card shadow-sm', className)}>
-      <CardHeader className="flex flex-row items-start justify-between gap-4 pb-4">
-        <div className="space-y-2">
+      <CardHeader className="flex flex-row items-start justify-between gap-4 pb-3">
+        <div className="space-y-1.5">
           <CardTitle className="text-xl tracking-tight text-foreground">{title}</CardTitle>
           {description && (
-            <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
+            <p className="max-w-xl text-sm leading-5 text-muted-foreground">{description}</p>
           )}
         </div>
         {action && <div className="flex shrink-0 items-center gap-2">{action}</div>}

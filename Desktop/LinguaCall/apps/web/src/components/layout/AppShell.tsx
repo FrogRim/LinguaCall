@@ -13,13 +13,10 @@ export function AppShell({
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-12 pt-4 sm:px-6 lg:px-8">
-        <div className="relative z-40 mb-8 flex items-center justify-between gap-4 rounded-full border border-border bg-card px-4 py-3 shadow-sm">
+        <div className="relative z-40 mb-6 flex items-center justify-between gap-4 rounded-full border border-border bg-card px-4 py-2.5 shadow-sm">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.24em] text-primary">
               LinguaCall
-            </div>
-            <div className="hidden text-sm text-muted-foreground sm:block">
-              Short speaking practice for real routines
             </div>
           </div>
           <div className="relative z-50 flex items-center gap-2 overflow-visible">{headerActions}</div>
@@ -46,11 +43,11 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        'flex flex-col gap-4 rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8 lg:flex-row lg:items-end lg:justify-between',
+        'flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-7 lg:flex-row lg:items-end lg:justify-between',
         className
       )}
     >
-      <div className="max-w-3xl space-y-3">
+      <div className="max-w-3xl space-y-2.5">
         {eyebrow && (
           <div className="text-xs font-semibold uppercase tracking-[0.24em] text-primary">
             {eyebrow}
@@ -84,7 +81,7 @@ export function HeroSection({
   return (
     <section
       className={cn(
-        'rounded-2xl border border-border bg-secondary p-6 shadow-sm sm:p-8',
+        'rounded-2xl border border-border bg-secondary p-5 shadow-sm sm:p-7',
         className
       )}
     >

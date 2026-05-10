@@ -73,18 +73,25 @@ Twilio가 Supabase에 연결된 뒤 진행한다.
 
 ## 3. 결제 검증
 
-### 3.1 Apps in Toss 샌드박스
+### 3.1 현재 사용자 노출 경로
 
 - 일반 웹에서 `/#/billing` 접속
 - 현재 플랜 상태와 Apps in Toss 안내 문구 확인
-- 웹에서 유료 CTA가 비활성인지 확인
-- Apps in Toss 호스트에서 `/#/billing` 재진입
+- 유료 플랜 CTA 클릭 시 결제가 시작되지 않고 안내 문구만 노출되는지 확인
+- 일반 브라우저에서 Toss 리디렉션이나 외부 결제창이 열리지 않는지 확인
+
+### 3.2 Apps in Toss 결제 준비 상태 수동 검증
+
+현재 저장소 기준으로 인앱 결제 백엔드 경로는 남아 있지만, `ScreenBilling`은 아직 직접 payment launch를 연결하지 않는다. 따라서 운영 전환 전에는 아래를 **수동 통합 검증**으로 확인한다.
+
+- Apps in Toss 인증 테스트 환경 준비
+- `POST /billing/apps-in-toss/verify-session` 성공 확인
 - `POST /billing/apps-in-toss/payment-launch` 호출 확인
 - 샌드박스 결제 완료
 - webhook 반영 후 구독 상태 업데이트 확인
 - 새로고침 후 상태 유지 확인
 
-### 3.2 실패 시나리오
+### 3.3 실패 시나리오
 
 - Apps in Toss에서 결제 취소
 - launch 준비 API 실패
@@ -95,7 +102,8 @@ Twilio가 Supabase에 연결된 뒤 진행한다.
 통과 기준:
 
 - 일반 웹에서 직접 checkout/confirm 경로가 보이지 않음
-- Apps in Toss에서 payment launch 준비가 성공함
+- billing 화면 CTA가 현재 릴리스 의도와 맞는 안내만 제공함
+- Apps in Toss 수동 검증에서 payment launch 준비가 성공함
 - webhook 반영 후 상태가 새로고침 후에도 유지됨
 - 실패/unsupported/legacy 상태마다 다음 행동이 분명함
 

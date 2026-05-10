@@ -23,6 +23,7 @@ function maskPhone(phone: string) {
 
 export default function ScreenVerify() {
   const { i18n, t } = useTranslation();
+  const isKo = i18n.language.startsWith('ko');
   const { refreshSession, startPhoneOtp, verifyPhoneOtp } = useUser();
   const navigate = useNavigate();
   const copy = getFriendlyCopy(i18n.language);
@@ -39,7 +40,7 @@ export default function ScreenVerify() {
     setError('');
     try {
       await startPhoneOtp(phone);
-      setMessage(`Sent to ${maskPhone(phone)}`);
+      setMessage(isKo ? `${maskPhone(phone)} 번호로 코드를 보냈습니다.` : `Code sent to ${maskPhone(phone)}`);
       setShowOtp(true);
     } catch (err) {
       setError(describeApiError(err, 'phone_start'));
@@ -73,11 +74,11 @@ export default function ScreenVerify() {
       sidebarCopy={copy.verify.supportCopy}
       sidebarPoints={copy.verify.steps}
     >
-      <CardContent className="space-y-8 px-8 py-8 sm:px-10 sm:py-10">
-        <div className="space-y-3">
+      <CardContent className="space-y-7 px-8 py-8 sm:px-10 sm:py-10">
+        <div className="space-y-2.5">
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             <ShieldCheck className="h-3.5 w-3.5" />
-            Secure session
+            {isKo ? '안전한 확인' : 'Secure verification'}
           </div>
           <div>
             <h2 className="text-3xl font-semibold tracking-tight text-foreground">
@@ -89,7 +90,7 @@ export default function ScreenVerify() {
           </div>
         </div>
 
-        <div className="grid gap-3 rounded-xl border border-border bg-secondary p-4 sm:grid-cols-2">
+        <div className="grid gap-3 rounded-xl border border-border bg-secondary p-3.5 sm:grid-cols-2">
           <div className={`rounded-lg px-4 py-3 text-sm ${showOtp ? 'bg-card text-muted-foreground' : 'bg-foreground text-background'}`}>
             1. {t('verify.phoneLabel')}
           </div>

@@ -33,11 +33,11 @@ test("detectHostRuntime returns apps-in-toss when a known bridge object exists",
   assert.equal(runtime.hasBridge, true);
 });
 
-test("detectHostRuntime returns unknown when the Toss host is hinted but no bridge is available", () => {
+test("detectHostRuntime returns apps-in-toss when the Toss WebView UA is present but bridge is not injected yet", () => {
   const runtime = detectHostRuntime({
     navigator: { userAgent: "Mozilla/5.0 TossAndroidWebView/1.0" }
   });
 
-  assert.equal(runtime.platform, "unknown");
+  assert.equal(runtime.platform, "apps-in-toss");
   assert.equal(runtime.hasBridge, false);
 });

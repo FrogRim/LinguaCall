@@ -60,7 +60,7 @@ export const detectHostRuntime = (probe: HostRuntimeProbe): HostRuntime => {
 
   if (TOSS_HOST_HINT.test(readUserAgent(probe))) {
     return {
-      platform: "unknown",
+      platform: "apps-in-toss",
       hasBridge: false,
       bridge: null
     };
