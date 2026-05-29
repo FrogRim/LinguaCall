@@ -1,126 +1,89 @@
-# AI 투자 하니스
+# LinguaCall
 
-앱인토스 미니앱에서 초보 투자자가 자연어 또는 가이드형 입력으로 가격/조건 알림 하니스를 만들 수 있게 하는 프로젝트입니다.
-현재 저장소는 프런트엔드(Vite/React)와 백엔드(Fastify/Prisma)로 나뉘어 있습니다.
+실시간 AI 회화 연습을 위한 WebRTC 기반 언어 학습 MVP입니다. 브라우저가 OpenAI Realtime API에 직접 연결되고, API 서버와 worker는 인증, 세션, 결제, 리포트 생성 흐름을 담당합니다.
 
-## 저장소 구성
+> Portfolio position: realtime AI product engineering, browser voice UX, launch-oriented backend/worker/deploy pipeline.
 
-- `frontend/` — Vite + React + Vitest 기반 미니앱 UI
-- `backend/` — Fastify + TypeScript + Prisma API 서버
-- `tasks/` — 현재 진행 중인 launch-readiness 계획과 체크리스트
+## Problem
 
-## 로컬 실행
+언어 시험 준비자는 실제 대화처럼 말하고 즉시 피드백을 받아야 하지만, 일반 채팅형 학습 도구는 음성 턴 제어, 실시간성, 교정 리포트, 단어 확인 흐름이 분리되어 있습니다. LinguaCall은 브라우저 음성 대화와 학습 리포트를 한 제품 흐름으로 묶는 것을 목표로 했습니다.
 
-### 1) 백엔드
+## What I Built
 
-```bash
-cd backend
-npm install
-cp .env.example .env
-npm run migrate:deploy
-npm run dev
+- Browser-direct OpenAI Realtime voice session over WebRTC
+- Push-to-Talk 기반 음성 입력 제어
+- Supabase Auth phone OTP 기반 로그인과 bearer-token API auth
+- Supabase Postgres 기반 세션/리포트 데이터 저장
+- Toss sandbox billing path
+- API process와 분리된 async report worker
+- 문법 교정 highlight, 단어 dictionary popover, session delete UX
+- VPS self-hosted deployment path: `web + api + worker + caddy`
+
+## My Role
+
+개인 프로젝트로 프론트엔드, 백엔드, 인증, worker, 배포 구조를 단독 설계하고 구현했습니다. 초기 SaaS-heavy 구조를 걷어내고, 한국 시장 MVP에 필요한 Supabase/Toss/VPS 중심 launch stack으로 단순화했습니다.
+
+## Stack
+
+| Area | Stack |
+| --- | --- |
+| Frontend | React, TypeScript, Vite, Tailwind CSS |
+| Realtime voice | WebRTC, OpenAI Realtime API |
+| Backend | Node.js, TypeScript, API server, worker process |
+| Auth/Data | Supabase Auth, Supabase Postgres |
+| Deploy | Docker Compose, Caddy, VPS |
+| Billing | Toss sandbox flow |
+
+## Repository Map
+
+현재 실제 앱 코드는 `Desktop/LinguaCall/` 아래에 있습니다. 루트 README는 포트폴리오 진입점으로 정리했고, 상세 launch/runbook 문서는 하위 폴더 문서를 기준으로 봅니다.
+
+```text
+Desktop/LinguaCall/
+  apps/       web, api, worker
+  packages/   shared packages
+  infra/      Docker/Caddy/deploy configuration
+  docs/       product and engineering notes
+  scripts/    launch smoke and validation scripts
 ```
 
-- 기본 포트: `http://localhost:3000`
-- 헬스체크: `http://localhost:3000/health`
-- 새 로컬 DB 초기화는 `migrate:deploy`, 이후 스키마 변경 작업은 `migrate:dev -- --name <change-name>` 를 사용합니다.
-
-### 2) 프런트엔드
+## Run Locally
 
 ```bash
-cd frontend
-npm install
-npm run dev
+cd Desktop/LinguaCall
+pnpm install
+pnpm dev
 ```
 
-- 기본 개발 주소: `http://localhost:5173`
-- 백엔드 API는 기본적으로 `http://localhost:3000`을 사용합니다.
-
-## 품질 검증
-
-### 프런트엔드
+Production-style checks and deployment helpers:
 
 ```bash
-cd frontend
-npm run lint
-npm run test
-npm run build
+cd Desktop/LinguaCall
+pnpm lint
+pnpm typecheck
+pnpm build
+pnpm launch:env:check
+pnpm launch:smoke
+pnpm compose:config
 ```
 
-### 백엔드
+Environment values are intentionally not committed. Use local `.env` / deployment secrets only.
 
-```bash
-cd backend
-npm run build
-npm test
-npm run typecheck
-```
+## Validation Evidence
 
-## Secret hygiene
+| Evidence | Result |
+| --- | --- |
+| Realtime voice path | Browser WebRTC session bootstrapping with PTT mode |
+| Auth | Supabase phone OTP and refresh-session recovery path |
+| Worker architecture | Report processing moved out of API process |
+| Learning UX | Grammar correction highlight and dictionary popover |
+| Deploy path | VPS Docker Compose stack with Caddy HTTPS |
+| Scope reduction | Clerk, Stripe, Railway, Vercel, Naver SMS, SOLAPI, Sentry removed from active launch path |
 
-- 실제 비밀값은 저장소에 넣지 말고 `backend/.env.example`를 복사한 로컬 `.env` 또는 배포 환경 변수에만 넣습니다.
-- `backend/.gitignore`는 `.env`, `.env.*`, 인증서/키 파일(`*.pem`, `*.key`, `*.crt`, `*.p12`, `*.pfx`)을 무시하도록 유지합니다.
-- `MTLS_CERT`, `MTLS_KEY`는 인증서 내용 자체가 아니라 **로컬/서버 파일 경로**를 가리켜야 합니다.
-- `SESSION_TOKEN_SECRET`는 서버에서만 보관하는 서명 키이며, 클라이언트 번들/브라우저 저장소/문서 스크린샷에 노출되면 안 됩니다.
-- `LLM_API_KEY`, `KIS_APPROVAL_KEY`, mTLS 인증서/키, `SESSION_TOKEN_SECRET`가 노출되었거나 사람 간에 임시 공유되었다면 출시 전에 새 값으로 교체합니다.
+## Demo / Screenshots
 
-## Launch secret checklist
+공개 가능한 데모 영상이나 스크린샷을 추가할 때 이 섹션에 배치합니다. 현재 README는 공개 가능한 아키텍처와 실행/검증 정보만 포함합니다.
 
-출시 직전에는 아래 항목을 다시 확인합니다.
+## Status
 
-- [ ] production 환경에 `DATABASE_URL`, `LLM_API_URL`, `LLM_API_KEY`, `LLM_MODEL`, `APPS_IN_TOSS_API_BASE_URL`, `NODE_ENV`, `HOST`, `PORT`, `LOG_LEVEL`, `SESSION_TOKEN_SECRET`이 올바르게 설정되어 있다.
-- [ ] 실시간 감시를 켤 경우 `KIS_WS_URL`, `KIS_APPROVAL_KEY`가 함께 설정되어 있다.
-- [ ] 현재 production 런타임에 필요한 `MTLS_CERT`, `MTLS_KEY`가 서버 로컬 경로를 가리키며, 인증서/키 원본 파일은 저장소 밖에 보관되어 있다.
-- [ ] `.env`, `.env.*`, 인증서/키 파일이 git 추적 대상이 아닌지 확인했다.
-- [ ] launch 직전 `LLM_API_KEY`, `KIS_APPROVAL_KEY`, mTLS 인증서/키의 최신 유효값과 교체 이력을 확인했다.
-
-## Production dependency audit status (2026-04-13)
-
-- 프런트엔드 `npm audit --omit=dev`는 `@apps-in-toss/web-framework`를 `2.4.6`까지 올린 뒤에도 **20건(High 14 / Low 6)** 을 보고합니다.
-- 남은 High는 모두 `@apps-in-toss/web-framework`가 끌고 오는 App-in-Toss / Granite CLI·native 체인(`@apps-in-toss/cli`, `@granite-js/mpack`, `fastify@4.x`, `react-native` 호환 패키지)에서 발생합니다.
-- 현재 앱 소스는 `@apps-in-toss/web-framework`의 웹 API만 사용하며, 빌드 산출물 `frontend/dist/**/*.js`에는 `fastify`, `find-my-way`, `react-native`, `@granite-js` 문자열이 남지 않아 브라우저 런타임 번들에는 포함되지 않음을 확인했습니다.
-- 따라서 프런트 audit High는 **현재 출시 후보의 브라우저 런타임 경로가 아니라 SDK 패키징/도구 체인에 묶인 upstream residual risk** 로 분류합니다. App-in-Toss SDK 신규 릴리스가 나오면 재점검이 필요합니다.
-- 백엔드 `npm audit --omit=dev`는 **3건의 Moderate** 를 보고하며, 모두 `@prisma/client -> prisma -> @prisma/dev -> @hono/node-server` 체인에 있습니다.
-- 백엔드 앱 코드는 Hono를 직접 사용하지 않고, 현재 최신 Prisma(`7.7.0`)도 같은 체인을 포함하므로 이는 **Prisma tooling 쪽 upstream residual risk** 로 기록합니다.
-- 정리하면 현재 Task 9 기준 unresolved 항목은 모두 문서화된 upstream/tooling residual risk이며, 직접 앱 코드/브라우저 번들 경로의 Critical/High blocker는 확인되지 않았습니다.
-
-## Final pre-launch rehearsal & rollback
-
-### Engineering verification completed in this repo
-- Frontend: `npm run lint`, `npm run test`, `npm run build`
-- Backend: `npm run migrate:status`, `npm run migrate:deploy`, `npm run build`, `npm test`, `npm run typecheck`
-- Result: current local release candidate passes the repo-controlled checks above.
-
-### Manual launch gate still required
-- [ ] 실 App-in-Toss 컨테이너에서 auth bootstrap 성공 확인
-- [ ] Builder에서 하니스 생성 1회 이상 확인
-- [ ] Dashboard에서 하니스 조회 후 토글 또는 삭제 1회 확인
-- [ ] History 화면 진입 확인
-- [ ] production 값 확정: `DATABASE_URL`, `LLM_API_URL`, `LLM_API_KEY`, `LLM_MODEL`, `SESSION_TOKEN_SECRET`, `VITE_API_URL`
-- [ ] 실시간 감시를 켤 경우 `KIS_WS_URL`, `KIS_APPROVAL_KEY` 확정
-- [ ] `MTLS_CERT`, `MTLS_KEY` 경로와 인증서 유효기간 확인
-- [ ] App-in-Toss SDK / Prisma residual-risk 문구 검토 및 수용 여부 확정
-- [ ] rollback 실행 담당자와 트리거(`/health` 실패, `POST /users/login` 실패, `/harnesses` 이상) 확정
-- [ ] launch 중 확인할 monitoring/alert 채널 존재 여부 확정
-
-### Rollback triggers
-- **Frontend artifact issue**: 배포 직후 앱 진입, bootstrap, 주요 화면 렌더가 깨지면 직전 정상 프런트 산출물로 즉시 복귀 후 재확인합니다.
-- **Backend deploy issue**: `/health` 실패 또는 보호 API(`POST /users/login`, `/harnesses`) 이상 시 직전 정상 백엔드 산출물/설정으로 복귀 후 헬스체크와 보호 API를 재확인합니다.
-- **Migration/app mismatch**: 새 migration 추가 적용을 중단하고, 현재 적용된 schema와 호환되는 직전 앱 버전으로 되돌립니다. 검증되지 않은 DB 다운그레이드는 즉시 수행하지 않습니다.
-
-## 데이터베이스 / 배포 상태
-
-현재 저장소에는 `backend/prisma/migrations/` 기준의 초기 Prisma migration baseline이 커밋되어 있습니다.
-새 환경을 올릴 때는 `backend`에서 `npm run migrate:deploy` 로 스키마를 초기화하고, 이후 스키마 변경은 `npm run migrate:dev -- --name <change-name>` 로 추가합니다.
-
-`db:push`는 일회성 로컬 개발 보조 명령으로만 남겨 두며, 배포/재현 가능한 DB 절차로 간주하지 않습니다.
-
-## 앱인토스 연동 참고
-
-앱인토스 SDK/TDS 교체와 검수 체크리스트는 아래 문서를 기준으로 진행합니다.
-
-- `frontend/APPINTOSS_INTEGRATION.md`
-
-## 현재 알려진 하드닝 진행 항목
-
-`tasks/plan.md`, `tasks/todo.md`에 launch-readiness와 security hardening 계획이 정리되어 있습니다.
+MVP launch path is ready for real-user testing and hardening. Remaining work is product iteration, monitoring, and production launch validation.
