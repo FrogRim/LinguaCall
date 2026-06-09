@@ -21,6 +21,7 @@ Latest local changes pending deployment:
 - free/demo session duration UI now follows the active plan limit, defaulting to 3 minutes for the portfolio cost profile
 - OpenAI report-evaluation default model changed to `gpt-4.1-nano` for lower demo cost; env can still override
 - OpenAI Realtime WebRTC now uses GA `client_secrets` on the API and `/v1/realtime/calls` in the browser. If the VPS still has `OPENAI_REALTIME_SESSION_URL=https://api.openai.com/v1/realtime/sessions`, the API rewrites that legacy default to `/v1/realtime/client_secrets`; prefer setting `OPENAI_REALTIME_CLIENT_SECRET_URL` explicitly.
+- VPS web Docker builds now pass `VITE_BUILD_APPINTOSS=false` by default, so the portfolio build skips the heavy AppInToss Vite entry unless that flag is explicitly set to `true`.
 - Supabase Auth/RLS alignment migration added: `packages/db/migrations/20260609_supabase_auth_rls_alignment.sql`
 - billing UI/API now treat Toss as implemented-but-deferred: `ENABLE_TOSS_BILLING=false`, `VITE_ENABLE_TOSS_BILLING=false` keep checkout/payment launch/legacy confirm closed
 - shared/api/worker TypeScript build scripts were tightened so build/typecheck failures are visible instead of masked

@@ -27,6 +27,7 @@ services:
         VITE_TOSS_CLIENT_KEY: ${VITE_TOSS_CLIENT_KEY}
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
         VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_BUILD_APPINTOSS: ${VITE_BUILD_APPINTOSS:-false}
     restart: unless-stopped
     init: true
     expose:

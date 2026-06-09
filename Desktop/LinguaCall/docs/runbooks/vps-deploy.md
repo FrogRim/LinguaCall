@@ -71,6 +71,7 @@ APP_BASE_URL=https://app.example.com
 API_BASE_URL=https://api.example.com
 ALLOWED_ORIGINS=https://app.example.com
 VITE_API_BASE_URL=https://api.example.com
+VITE_BUILD_APPINTOSS=false
 ```
 
 ### Supabase
@@ -111,6 +112,7 @@ VITE_ENABLE_TOSS_BILLING=false
 ```
 
 Keep both billing flags `false` for the public portfolio demo. Set both to `true` only after business registration, Toss/AppInToss review, and a fresh sandbox-to-live billing verification pass.
+Keep `VITE_BUILD_APPINTOSS=false` on the small portfolio VPS unless the AppInToss entry point is actively needed.
 
 ### Worker
 
