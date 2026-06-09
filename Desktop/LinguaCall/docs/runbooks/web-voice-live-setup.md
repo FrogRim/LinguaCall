@@ -25,7 +25,7 @@ OPENAI_API_KEY=sk-...
 OPENAI_REALTIME_MODEL=gpt-realtime
 OPENAI_REALTIME_VOICE=alloy
 OPENAI_REALTIME_TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe
-OPENAI_REALTIME_SESSION_URL=https://api.openai.com/v1/realtime/sessions
+OPENAI_REALTIME_CLIENT_SECRET_URL=https://api.openai.com/v1/realtime/client_secrets
 
 PUBLIC_BASE_URL=https://app.example.com
 APP_BASE_URL=https://app.example.com

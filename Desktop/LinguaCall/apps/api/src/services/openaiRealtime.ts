@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { SessionAccuracyPolicy } from "@lingua/shared";
 
 const readEnv = (value?: string): string | undefined => {
@@ -40,6 +41,22 @@ const readExpiresAt = (...candidates: unknown[]): string | undefined => {
     }
   }
   return undefined;
+};
+
+const OPENAI_REALTIME_CLIENT_SECRET_URL = "https://api.openai.com/v1/realtime/client_secrets";
+
+const resolveRealtimeClientSecretUrl = (): string => {
+  const configuredUrl =
+    readEnv(process.env.OPENAI_REALTIME_CLIENT_SECRET_URL) ?? readEnv(process.env.OPENAI_REALTIME_SESSION_URL);
+  if (!configuredUrl) {
+    return OPENAI_REALTIME_CLIENT_SECRET_URL;
+  }
+
+  return configuredUrl.replace(/\/realtime\/sessions\/?$/, "/realtime/client_secrets");
+};
+
+const buildOpenAISafetyIdentifier = (userId: string): string => {
+  return createHash("sha256").update(userId).digest("hex");
 };
 
 export type CreateOpenAIRealtimeSessionInput = {
@@ -400,8 +417,10 @@ export const buildRealtimeTranscriptionConfig = (
 };
 
 export const buildRealtimeTurnDetectionConfig = () => ({
-  type: "semantic_vad" as const,
-  eagerness: "low" as const,
+  type: "server_vad" as const,
+  threshold: 0.55,
+  prefix_padding_ms: 300,
+  silence_duration_ms: 650,
   create_response: false,
   interrupt_response: false
 });
@@ -658,28 +677,41 @@ export const createOpenAIRealtimeSession = async (
   const model = readEnv(process.env.OPENAI_REALTIME_MODEL) ?? "gpt-realtime-mini";
   const voice = readEnv(process.env.OPENAI_REALTIME_VOICE) ?? "marin";
   const transcriptionModel = readEnv(process.env.OPENAI_REALTIME_TRANSCRIPTION_MODEL) ?? "gpt-4o-mini-transcribe";
-  const sessionUrl = readEnv(process.env.OPENAI_REALTIME_SESSION_URL) ?? "https://api.openai.com/v1/realtime/sessions";
+  const clientSecretUrl = resolveRealtimeClientSecretUrl();
 
-  const response = await fetch(sessionUrl, {
+  const response = await fetch(clientSecretUrl, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "OpenAI-Safety-Identifier": buildOpenAISafetyIdentifier(input.clerkUserId)
     },
     body: JSON.stringify({
-      model,
-      voice,
-      speed: 0.9,
-      modalities: ["audio", "text"],
-      instructions: buildInstructions(input),
-      input_audio_transcription: buildRealtimeTranscriptionConfig(input, transcriptionModel),
-      turn_detection: buildRealtimeTurnDetectionConfig()
+      expires_after: {
+        anchor: "created_at",
+        seconds: 600
+      },
+      session: {
+        type: "realtime",
+        model,
+        instructions: buildInstructions(input),
+        output_modalities: ["audio"],
+        audio: {
+          input: {
+            transcription: buildRealtimeTranscriptionConfig(input, transcriptionModel),
+            turn_detection: buildRealtimeTurnDetectionConfig()
+          },
+          output: {
+            voice
+          }
+        }
+      }
     })
   });
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(`failed_to_create_realtime_session: ${response.status} ${text}`.trim());
+    throw new Error(`failed_to_create_realtime_client_secret: ${response.status} ${text}`.trim());
   }
 
   const payload = (await response.json()) as Record<string, unknown>;
@@ -693,6 +725,7 @@ export const createOpenAIRealtimeSession = async (
     asRecord(sessionPayload?.ephemeralKey);
 
   const clientSecretValue = readStringValue(
+    payload.value,
     clientSecretPayload?.value,
     clientSecretPayload?.secret,
     payload.client_secret,
@@ -713,19 +746,19 @@ export const createOpenAIRealtimeSession = async (
   }
 
   const expiresAt = readExpiresAt(
+    payload.expires_at,
+    payload.expiresAt,
     clientSecretPayload?.expires_at,
     clientSecretPayload?.expiresAt,
     secretPayload?.expires_at,
     secretPayload?.expiresAt,
     ephemeralPayload?.expires_at,
     ephemeralPayload?.expiresAt,
-    payload.expires_at,
-    payload.expiresAt,
     sessionPayload?.expires_at,
     sessionPayload?.expiresAt
   );
 
-  const resolvedModel = readStringValue(payload.model, sessionPayload?.model, model) ?? model;
+  const resolvedModel = readStringValue(sessionPayload?.model, payload.model, model) ?? model;
 
   return {
     clientSecret: clientSecretValue,

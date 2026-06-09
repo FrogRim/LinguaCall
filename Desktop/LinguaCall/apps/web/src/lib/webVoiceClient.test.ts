@@ -18,6 +18,7 @@ test("buildGreetingPayload: normal mode returns a response.create event", () => 
       payload.response.instructions.length > 0,
     "should contain instructions"
   );
+  assert.deepEqual(payload.response.output_modalities, ["audio"]);
 });
 
 test("buildGreetingPayload: PTT mode returns null (no auto-greeting)", () => {
@@ -38,16 +39,12 @@ test("buildPttSessionUpdate: type is session.update", () => {
 
 test("buildPttSessionUpdate: turn_detection is null (VAD disabled)", () => {
   const update = buildPttSessionUpdate();
+  assert.equal(update.session.type, "realtime");
   assert.equal(
-    update.session.turn_detection,
+    update.session.audio.input.turn_detection,
     null,
     "PTT mode must disable server-side VAD"
   );
-});
-
-test("buildPttSessionUpdate: input_audio_format is pcm16", () => {
-  const update = buildPttSessionUpdate();
-  assert.equal(update.session.input_audio_format, "pcm16");
 });
 
 // ── matchesEarlyExitKeyword ───────────────────────────────────────────────────

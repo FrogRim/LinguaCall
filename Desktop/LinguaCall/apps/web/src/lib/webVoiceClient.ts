@@ -35,6 +35,8 @@ import { buildGreetingPayload, buildPttSessionUpdate, matchesEarlyExitKeyword } 
 export { buildGreetingPayload, buildPttSessionUpdate, matchesEarlyExitKeyword } from "./pttHelpers";
 export type { GreetingPayload, PttSessionUpdate } from "./pttHelpers";
 
+const OPENAI_REALTIME_CALL_URL = "https://api.openai.com/v1/realtime/calls";
+
 const postJson = async <T>(
   apiBase: string,
   path: string,
@@ -278,7 +280,7 @@ export const startWebVoiceClient = async ({
         dataChannel.send(JSON.stringify({
           type: "response.create",
           response: {
-            modalities: ["audio", "text"],
+            output_modalities: ["audio"],
             instructions:
               assistantTurnCount === 0
                 ? `This is your first reply in the session. Speak only in ${targetLanguage}. Give a brief greeting, confirm the topic "${bootstrap.topic}" naturally, and ask one easy follow-up question that fits ${bootstrap.level} level. Keep it to at most two short sentences.`
@@ -407,7 +409,7 @@ export const startWebVoiceClient = async ({
         return;
       }
 
-      if (eventType === "response.audio_transcript.delta") {
+      if (eventType === "response.audio_transcript.delta" || eventType === "response.output_audio_transcript.delta") {
         const key = getAssistantRealtimeKey(payload);
         const delta = String(payload.delta ?? "");
         assistantBuffers.set(key, `${assistantBuffers.get(key) ?? ""}${delta}`);
@@ -430,7 +432,11 @@ export const startWebVoiceClient = async ({
         return;
       }
 
-      if (eventType === "response.audio_transcript.done" || eventType === "response.output_text.done") {
+      if (
+        eventType === "response.audio_transcript.done" ||
+        eventType === "response.output_audio_transcript.done" ||
+        eventType === "response.output_text.done"
+      ) {
         const key = getAssistantRealtimeKey(payload);
         const finalText = String(
           payload.transcript ??
@@ -502,7 +508,7 @@ export const startWebVoiceClient = async ({
   await peer.setLocalDescription(offer);
 
   try {
-    const sdpResponse = await fetch(`https://api.openai.com/v1/realtime?model=${encodeURIComponent(bootstrap.model)}`, {
+    const sdpResponse = await fetch(OPENAI_REALTIME_CALL_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${bootstrap.clientSecret}`,

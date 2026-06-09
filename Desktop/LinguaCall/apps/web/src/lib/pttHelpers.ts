@@ -5,7 +5,7 @@
 
 export type GreetingPayload = {
   type: "response.create";
-  response: { modalities: string[]; instructions: string };
+  response: { output_modalities: string[]; instructions: string };
 } | null;
 
 /** Returns the greeting event to send on dataChannel open, or null in PTT mode. */
@@ -14,7 +14,7 @@ export const buildGreetingPayload = (pttMode: boolean): GreetingPayload => {
   return {
     type: "response.create",
     response: {
-      modalities: ["audio", "text"],
+      output_modalities: ["audio"],
       instructions: "Greet the learner briefly and start the conversation immediately."
     }
   };
@@ -22,13 +22,13 @@ export const buildGreetingPayload = (pttMode: boolean): GreetingPayload => {
 
 export type PttSessionUpdate = {
   type: "session.update";
-  session: { turn_detection: null; input_audio_format: "pcm16" };
+  session: { type: "realtime"; audio: { input: { turn_detection: null } } };
 };
 
 /** Returns the session.update event that disables server-side VAD for PTT mode. */
 export const buildPttSessionUpdate = (): PttSessionUpdate => ({
   type: "session.update",
-  session: { turn_detection: null, input_audio_format: "pcm16" }
+  session: { type: "realtime", audio: { input: { turn_detection: null } } }
 });
 
 /**
