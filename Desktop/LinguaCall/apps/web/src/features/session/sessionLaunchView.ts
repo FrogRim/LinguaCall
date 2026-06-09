@@ -53,3 +53,11 @@ export function getSessionConstraintState(
 ): SessionConstraintState {
   return durationOptions.includes(15) ? "ten_or_fifteen" : "ten_minute_only";
 }
+
+export function resolveDurationOptions(maxSessionMinutes?: number | null): number[] {
+  const max = typeof maxSessionMinutes === "number" && maxSessionMinutes > 0
+    ? maxSessionMinutes
+    : 3;
+  const standardOptions = [3, 5, 10, 15].filter((option) => option <= max);
+  return standardOptions.length > 0 ? standardOptions : [max];
+}

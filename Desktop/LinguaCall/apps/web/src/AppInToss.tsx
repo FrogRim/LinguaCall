@@ -29,6 +29,7 @@ function AppInTossUserProvider({ children }: { children: React.ReactNode }) {
       await i18n.changeLanguage(lang);
     },
     clearIdentity: noop,
+    startDemoSession: noop,
     startPhoneOtp: noop,
     verifyPhoneOtp: noop,
   };

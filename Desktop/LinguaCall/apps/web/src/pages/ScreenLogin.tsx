@@ -1,28 +1,45 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowRight, CreditCard } from 'lucide-react';
+import { ArrowRight, CreditCard, PlayCircle } from 'lucide-react';
 import AuthLayout from '../components/layout/AuthLayout';
+import { StatusBanner } from '../components/layout/SectionCard';
 import { Button } from '../components/ui/button';
 import { getFriendlyCopy } from '../content/friendlyCopy';
 import { useUser } from '../context/UserContext';
+import { describeApiError } from '../lib/api';
 import { getHostRuntime } from '../lib/hostRuntime';
 
 export default function ScreenLogin() {
   const { i18n } = useTranslation();
-  const { isAuthenticated, sessionChecked } = useUser();
+  const { isAuthenticated, sessionChecked, startDemoSession } = useUser();
   const navigate = useNavigate();
   const copy = getFriendlyCopy(i18n.language);
   const hostRuntime = getHostRuntime();
   const billingCta = hostRuntime.platform === 'apps-in-toss'
     ? copy.login.secondaryCtaAppsInToss
     : copy.login.secondaryCta;
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (sessionChecked && isAuthenticated) {
       navigate('/session');
     }
   }, [isAuthenticated, navigate, sessionChecked]);
+
+  const handleDemoStart = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await startDemoSession();
+      navigate('/session');
+    } catch (err) {
+      setError(describeApiError(err, 'demo_login'));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <AuthLayout
@@ -44,8 +61,9 @@ export default function ScreenLogin() {
         </div>
 
         <div className="grid gap-3">
-          <Button size="lg" className="w-full gap-2" onClick={() => navigate('/verify')}>
-            <span>{copy.login.primaryCta}</span>
+          <Button size="lg" className="w-full gap-2" onClick={() => void handleDemoStart()} disabled={loading}>
+            <PlayCircle className="h-4 w-4" />
+            <span>{loading ? copy.login.primaryCtaLoading : copy.login.primaryCta}</span>
             <ArrowRight className="h-4 w-4" />
           </Button>
           <Button
@@ -58,6 +76,8 @@ export default function ScreenLogin() {
             <span>{billingCta}</span>
           </Button>
         </div>
+
+        {error && <StatusBanner tone="danger">{error}</StatusBanner>}
 
         <div className="rounded-xl border border-border bg-secondary px-4 py-3 text-sm leading-6 text-muted-foreground">
           {copy.login.valueSummary}

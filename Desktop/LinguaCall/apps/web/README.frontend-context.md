@@ -1,5 +1,7 @@
 # Frontend Context Entry
 
+Current public portfolio auth flow: `ScreenLogin.tsx` starts a Supabase anonymous demo session through `UserContext.startDemoSession()`. `/#/verify` redirects back to login, so phone OTP UI/helpers remain preserved but hidden from public visitors.
+
 Codex가 `apps/web` 범위에서 작업할 때 먼저 읽어야 할 문서 순서:
 
 1. `../../DESIGN.md`
@@ -29,7 +31,7 @@ apps/web/src/
       LanguagePicker.tsx
 
   context/
-    UserContext.tsx              — Supabase 세션, startPhoneOtp, verifyPhoneOtp
+    UserContext.tsx              — Supabase 세션, startDemoSession, hidden startPhoneOtp/verifyPhoneOtp helpers
 
   features/
     auth/verifyFlow.ts           — OTP 인증 완료 후 세션 이동 흐름
@@ -48,7 +50,7 @@ apps/web/src/
 
   pages/
     ScreenLogin.tsx              — 로그인 시작 화면
-    ScreenVerify.tsx             — 전화번호 OTP 인증
+    ScreenVerify.tsx             — 전화번호 OTP 인증 UI (public route redirects away)
     ScreenSession.tsx            — 세션 허브 + 라이브 세션 + 히스토리
     ScreenBilling.tsx            — 플랜 비교 + Toss 결제
     ScreenReport.tsx             — 리포트 상세 (하이라이팅, 사전 팝오버)
@@ -72,5 +74,5 @@ apps/web/src/
 
 - `DESIGN.md`가 전역 디자인 기준이다.
 - design-tokens의 CSS 변수는 `styles.css`에 정의되어 있다.
-- 인증은 Supabase Auth (phone OTP). Clerk 코드는 archival이다.
+- 인증은 Supabase Auth anonymous demo login이다. phone OTP 코드는 보존되어 있지만 공개 포트폴리오 경로에서는 숨겨져 있고, Clerk 코드는 archival이다.
 - `webVoiceClient.ts`는 PTT 모드(`pttMode: true`)로 실행된다.

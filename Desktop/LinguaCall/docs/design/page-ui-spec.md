@@ -7,6 +7,8 @@ PRD의 screen description을 프론트엔드 작업 단위에 맞게 다시 정�
 
 이 문서는 scope-locked PRD와 함께 읽는다.
 
+2026-06-09 portfolio override: 공개 포트폴리오 경로는 전화번호 OTP 대신 Supabase 익명 데모 로그인 CTA를 사용한다. 전화번호 OTP 화면은 코드상 보존하지만 공개 라우트에서는 숨긴다. 무료 데모 세션은 비용 관리를 위해 3분부터 시작한다.
+
 ---
 
 ## 1. 공통 원칙
@@ -60,19 +62,19 @@ PRD의 screen description을 프론트엔드 작업 단위에 맞게 다시 정�
 ### 목적
 
 - 처음 보는 사용자에게 바로 신뢰감을 준다
-- 전화번호 인증 시작까지의 거리를 짧게 만든다
+- 데모 체험 시작까지의 거리를 짧게 만든다
 - 제품 가치와 결제 진입을 과하게 섞지 않는다
 
 ### 핵심 컴포넌트
 
 - LogoBlock
 - HeroText
-- PrimaryPhoneVerificationButton
+- PrimaryDemoStartButton
 - SecondaryBillingComparisonButton
 
 ### 필수 요소
 
-- 전화번호 인증으로 시작하는 primary CTA
+- 데모로 바로 체험하는 primary CTA
 - 플랜 비교로 이어지는 secondary CTA
 - 짧은 제품 가치 문장
 - 긴 설명보다 바로 다음 행동이 먼저 보이는 구조
@@ -102,6 +104,7 @@ PRD의 screen description을 프론트엔드 작업 단위에 맞게 다시 정�
 
 ### 목적
 
+- 공개 포트폴리오 데모에서는 숨긴다
 - 전화 수신 가능한 사용자임을 빠르게 확인
 - 인증 과정을 명확하게 안내
 
@@ -162,7 +165,7 @@ PRD의 screen description을 프론트엔드 작업 단위에 맞게 다시 정�
 
 - EN / OPIC 경로를 가장 이해하기 쉽게 보여주는 것은 허용된다
 - 다국어 지원은 제거하지 않고, launch path보다 덜 강조되게 노출한다
-- Free, trial 사용자는 10분만 선택 가능
+- Free, trial 사용자는 현재 플랜의 최소 데모 시간만 선택 가능 (공개 데모 기본 3분)
 - 15분 옵션은 paid plan에서만 보인다
 - contact mode는 immediate 또는 scheduled_once
 - scheduled_once는 현재 시각 + 15분 이후, 7일 이내만 허용
@@ -191,7 +194,7 @@ PRD의 screen description을 프론트엔드 작업 단위에 맞게 다시 정�
 
 ### 유효성 메시지 예시
 
-- free plan에서는 10분만 선택할 수 있습니다
+- free plan에서는 3분 데모 세션부터 시작할 수 있습니다
 - 예약 통화는 최소 15분 이후부터 가능합니다
 - 예약은 7일 이내만 가능합니다
 
@@ -404,7 +407,7 @@ PRD의 screen description을 프론트엔드 작업 단위에 맞게 다시 정�
 
 - 지금은 전화를 연결할 수 없습니다. 잠시 후 다시 시도해주세요.
 - 예약은 최소 15분 이후부터 가능합니다.
-- free 체험은 10분만 선택할 수 있습니다.
+- free 체험은 3분 데모 세션부터 시작할 수 있습니다.
 - 이미 예약된 통화가 있습니다.
 
 ### conflict 상태

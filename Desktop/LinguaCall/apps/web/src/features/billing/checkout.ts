@@ -106,7 +106,7 @@ export const readBillingReturnState = (
     checkoutResult,
     checkoutPlan,
     tossRedirect,
-    shouldConfirm: checkoutResult === "success" && tossRedirect !== null,
+    shouldConfirm: false,
     hasLegacyReturn: checkoutResult !== null || tossRedirect !== null,
     channel: tossRedirect !== null ? 'web' : checkoutResult !== null ? 'appintoss' : null
   };
@@ -211,8 +211,17 @@ export function resolveBillingLaunch(
     webNote: string;
     appsInTossUnavailableNote: string;
     hostUnavailableNotice: string;
+    paymentDeferredNote?: string;
+    paymentEnabled?: boolean;
   }
 ): WebBillingLaunchResolution {
+  if (notices.paymentEnabled === false) {
+    return {
+      shouldStartCheckout: false,
+      errorMessage: notices.paymentDeferredNote ?? notices.webNote
+    };
+  }
+
   if (canLaunchAppsInTossPayment(runtime) && readAppsInTossLoginBridge(runtime)) {
     return {
       shouldStartCheckout: true,
@@ -244,6 +253,11 @@ export async function startWebBillingCheckout(options: {
 }): Promise<BillingCheckoutSession> {
   const payload = createCheckoutPayload(options.originUrl, options.planCode);
   return options.apiPost<BillingCheckoutSession>('/billing/checkout', payload);
+}
+
+export function isTossBillingEnabled(env?: Record<string, string | undefined>): boolean {
+  const source = env ?? (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env ?? {};
+  return source.VITE_ENABLE_TOSS_BILLING === "true";
 }
 
 export async function confirmWebBillingCheckout(options: {

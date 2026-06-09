@@ -12,7 +12,7 @@
 함께 볼 문서:
 
 - [`launch-e2e-checklist.md`](./launch-e2e-checklist.md)
-- [`supabase-phone-auth-manual.md`](./supabase-phone-auth-manual.md)
+- [`supabase-demo-auth-manual.md`](./supabase-demo-auth-manual.md)
 - [`toss-sandbox-manual.md`](./toss-sandbox-manual.md)
 
 ## 1. 배포 상태
@@ -43,19 +43,19 @@ curl -I "https://APP_DOMAIN"
 
 ## 2. 인증 검증
 
-### 2.1 Supabase 테스트 OTP
+### 2.1 Supabase 익명 데모 로그인
 
-- `/#/verify` 접속
-- Supabase 테스트 번호로 OTP 요청
-- OTP 입력
+- `/#/` 접속
+- `데모로 바로 체험하기` 클릭
 - `/#/session` 이동 확인
 - 새로고침 후 로그인 유지 확인
+- `/#/verify` 직접 접근 시 로그인 화면으로 돌아가는지 확인
 - 로그아웃 확인
 - 보호 경로 재진입 시 로그인 화면으로 복귀 확인
 
-### 2.2 실제 SMS OTP
+### 2.2 전화번호 OTP 회귀 검증 (나중에 다시 열 때만)
 
-Twilio가 Supabase에 연결된 뒤 진행한다.
+포트폴리오 데모에서는 전화번호 OTP를 노출하지 않는다. 사업자/실명/전화 인증 요구가 생겨 이 경로를 다시 열 때만 진행한다.
 
 - 실제 기기 번호로 OTP 요청
 - SMS 도착 확인
@@ -69,7 +69,8 @@ Twilio가 Supabase에 연결된 뒤 진행한다.
 - 로그인 성공
 - 세션 복구 성공
 - 로그아웃 성공
-- 실제 SMS 도착 및 인증 성공
+- 공개 포트폴리오 방문자에게 전화번호 입력 화면이 노출되지 않음
+- 전화번호 OTP를 다시 열기로 한 환경에서는 실제 SMS 도착 및 인증 성공
 
 ## 3. 결제 검증
 
@@ -82,7 +83,7 @@ Twilio가 Supabase에 연결된 뒤 진행한다.
 
 ### 3.2 Apps in Toss 결제 준비 상태 수동 검증
 
-현재 저장소 기준으로 인앱 결제 백엔드 경로는 남아 있지만, `ScreenBilling`은 아직 직접 payment launch를 연결하지 않는다. 따라서 운영 전환 전에는 아래를 **수동 통합 검증**으로 확인한다.
+현재 저장소 기준으로 인앱 결제 백엔드 경로는 남아 있지만, 포트폴리오 데모에서는 `ENABLE_TOSS_BILLING=false`, `VITE_ENABLE_TOSS_BILLING=false`로 payment launch를 막는다. 사업자등록/심사 완료 후 두 flag를 `true`로 재빌드한 환경에서만 아래를 **수동 통합 검증**으로 확인한다.
 
 - Apps in Toss 인증 테스트 환경 준비
 - `POST /billing/apps-in-toss/verify-session` 성공 확인
@@ -172,7 +173,7 @@ Twilio가 Supabase에 연결된 뒤 진행한다.
 
 확인 항목:
 
-- 로그인
+- 데모 로그인
 - 결제
 - 세션 생성
 - 라이브 통화 시작
@@ -208,8 +209,8 @@ Twilio가 Supabase에 연결된 뒤 진행한다.
 
 가능하면 아래를 직접 유도하거나 시뮬레이션한다.
 
-- 잘못된 OTP
-- 만료된 OTP
+- Supabase anonymous sign-in 실패
+- 전화번호 OTP 재활성화 환경에서는 잘못된 OTP/만료된 OTP
 - 결제 취소
 - 마이크 없음
 - 마이크 권한 거부
@@ -274,8 +275,8 @@ curl -i -X POST "https://API_DOMAIN/workers/run" -H "x-worker-token: YOUR_WORKER
 아래가 모두 맞으면 제한적 실사용자 투입 가능으로 본다.
 
 - 배포 상태 정상
-- 실제 OTP 정상
-- 결제 정상
+- 데모 인증 정상
+- 결제 보류 상태 정상
 - 세션 생성 정상
 - 라이브 통화 정상
 - 리포트 정상
@@ -286,7 +287,7 @@ curl -i -X POST "https://API_DOMAIN/workers/run" -H "x-worker-token: YOUR_WORKER
 
 아래 중 하나라도 남아 있으면 launch-ready로 보지 않는다.
 
-- 실제 SMS 도착이 불안정
+- 데모 인증이 불안정하거나 전화번호 OTP 화면이 공개 경로에 노출됨
 - Apps in Toss launch 또는 webhook 반영이 불안정
 - 라이브 세션 시작 또는 종료가 자주 깨짐
 - 리포트가 장시간 pending

@@ -40,8 +40,8 @@ Expected shape:
 
 ## Optional but recommended
 
-- `TOSS_CLIENT_KEY` and `TOSS_SECRET_KEY` (required for billing)
-- `OPENAI_REALTIME_MODEL`, `OPENAI_EVAL_MODEL` set to correct model names
+- `TOSS_CLIENT_KEY` and `TOSS_SECRET_KEY` (required only when billing launch is approved/enabled)
+- `OPENAI_REALTIME_MODEL=gpt-realtime-mini`, `OPENAI_EVAL_MODEL=gpt-4.1-nano` for the low-cost portfolio demo profile
 - `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` baked into web build
 
 ## Environment validation script
@@ -55,8 +55,8 @@ Expected output: `[launch-env] ok`
 ## Supabase setup checklist
 
 - [ ] Project created
-- [ ] Phone Auth enabled (`Authentication > Providers > Phone`)
-- [ ] Twilio or test phone numbers configured in Supabase Phone Auth
+- [ ] Anonymous Sign-Ins enabled in Supabase Auth
+- [ ] Phone Auth remains disabled or hidden unless intentionally re-opened outside the portfolio demo
 - [ ] `Site URL` set to `https://APP_DOMAIN`
 - [ ] `Redirect URLs` includes `https://APP_DOMAIN/**`
 - [ ] `DATABASE_URL` copied from `Project Settings > Database`
@@ -78,6 +78,7 @@ Expected output: `[launch-env] ok`
 
 - [ ] Test or live keys ready
 - [ ] `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `VITE_TOSS_CLIENT_KEY` set
+- [ ] `ENABLE_TOSS_BILLING=false` and `VITE_ENABLE_TOSS_BILLING=false` for portfolio demo builds
 - [ ] Webhook URL registered in Toss dashboard: `https://API_DOMAIN/billing/webhooks/toss`
 
 ## Post-deploy smoke tests

@@ -1,7 +1,7 @@
 # SOLAPI SMS OTP 검증 매뉴얼
 
 > Archived: this document describes the old app-managed SOLAPI OTP path.
-> The active launch path now uses Supabase Auth phone OTP. Use [`supabase-phone-auth-manual.md`](./supabase-phone-auth-manual.md) instead.
+> The active public portfolio path now uses Supabase anonymous demo auth. Use [`supabase-demo-auth-manual.md`](./supabase-demo-auth-manual.md) instead.
 
 이 문서는 **전화번호 OTP 로그인**을 SOLAPI(CoolSMS)로 검증할 때 쓰는 **보조 런북**입니다.
 
