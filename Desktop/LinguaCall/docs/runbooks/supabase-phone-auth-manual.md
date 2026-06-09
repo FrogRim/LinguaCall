@@ -1,6 +1,8 @@
 # Supabase Phone Auth Manual
 
-Use this runbook to verify the current LinguaCall login path.
+> Archived for the public portfolio flow. The current visitor-facing login path uses [`supabase-demo-auth-manual.md`](./supabase-demo-auth-manual.md). Use this phone OTP runbook only if phone verification is intentionally re-enabled later.
+
+Use this runbook to verify the preserved phone OTP path.
 
 ## Current auth path
 

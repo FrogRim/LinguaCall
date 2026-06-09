@@ -5,7 +5,7 @@
 ## 함께 볼 문서
 
 - 배포: [`vps-deploy.md`](./vps-deploy.md)
-- 전화번호 인증: [`supabase-phone-auth-manual.md`](./supabase-phone-auth-manual.md)
+- 데모 인증: [`supabase-demo-auth-manual.md`](./supabase-demo-auth-manual.md)
 - 결제: [`toss-sandbox-manual.md`](./toss-sandbox-manual.md)
 
 ## 사전 조건
@@ -14,7 +14,7 @@
 
 - VPS에서 `web`, `api`, `worker`, `caddy`가 실행 중
 - `https://APP_DOMAIN`, `https://API_DOMAIN` 접근 가능
-- Supabase Phone Auth 활성화 완료
+- Supabase Anonymous Sign-Ins 활성화 완료
 - Toss 키 설정 완료
 - OpenAI 키 설정 완료
 
@@ -51,35 +51,33 @@ curl -I "https://APP_DOMAIN"
 
 - HTTP `200`
 
-## 2. 전화번호 인증 E2E
+## 2. 데모 인증 E2E
 
-상세 절차는 [`supabase-phone-auth-manual.md`](./supabase-phone-auth-manual.md)를 함께 본다.
+상세 절차는 [`supabase-demo-auth-manual.md`](./supabase-demo-auth-manual.md)를 함께 본다.
 
 확인 순서:
 
 1. `https://APP_DOMAIN/#/` 접속
-2. `/#/verify`로 이동
-3. 전화번호 입력
-4. OTP 요청
-5. OTP 입력
-6. `/#/session` 진입 확인
-7. 브라우저 새로고침
-8. 로그인 유지 확인
-9. 로그아웃
-10. `/#/session` 재진입 시 로그인 화면으로 돌아가는지 확인
+2. `데모로 바로 체험하기` 클릭
+3. `/#/session` 진입 확인
+4. 브라우저 새로고침
+5. 로그인 유지 확인
+6. `/#/verify` 직접 접근 시 로그인 화면으로 돌아가는지 확인
+7. 로그아웃
+8. `/#/session` 재진입 시 로그인 화면으로 돌아가는지 확인
 
 기대 결과:
 
-- OTP 요청 성공
-- OTP 검증 성공
+- Supabase anonymous sign-in 성공
 - 새로고침 후 세션 유지
+- 전화번호 입력/OTP 화면이 공개 방문자에게 보이지 않음
 - 로그아웃 후 보호 경로 차단
 
 ## 3. 결제 E2E
 
 상세 절차는 [`toss-sandbox-manual.md`](./toss-sandbox-manual.md)를 함께 본다.
 
-이 저장소의 현재 결제 모델은 **web visibility + Apps in Toss payment entry**다. 즉, 일반 브라우저의 `/#/billing`은 플랜 비교와 현재 구독 확인용이고, 실제 결제 시작은 Apps in Toss 내부에서만 허용된다.
+이 저장소의 현재 결제 모델은 **web visibility + deferred Toss billing**이다. 일반 브라우저의 `/#/billing`은 플랜 비교와 현재 구독 확인용이고, 포트폴리오 데모에서는 `ENABLE_TOSS_BILLING=false`, `VITE_ENABLE_TOSS_BILLING=false`로 결제 진입을 막는다.
 
 확인 순서:
 
@@ -88,7 +86,7 @@ curl -I "https://APP_DOMAIN"
 1. 로그인 상태에서 `https://APP_DOMAIN/#/billing` 진입
 2. 현재 구독 상태와 플랜 비교 UI 확인
 3. 유료 플랜 CTA를 눌러도 checkout이 시작되지 않는지 확인
-4. `플랜 변경은 Apps in Toss 안에서만 진행할 수 있습니다.` 안내 문구 확인
+4. `포트폴리오 데모에서는 유료 결제를 비활성화했습니다.` 계열 안내 문구 확인
 
 예상 API 호출:
 
@@ -99,12 +97,12 @@ curl -I "https://APP_DOMAIN"
 
 - web에서 checkout을 직접 시작하지 않음
 - CTA를 눌러도 Toss 리디렉션이나 외부 결제창으로 이동하지 않음
-- Apps in Toss 진입 필요성이 과장 없이 명확히 보임
+- Toss 심사/사업자등록 전 결제 보류 상태가 과장 없이 명확히 보임
 - `POST /billing/checkout` 또는 `POST /billing/toss/confirm`이 일반 브라우저 플로우에서 발생하지 않음
 
 ### 3.2 Apps in Toss 결제 준비 상태 수동 검증
 
-현재 저장소 기준으로 `ScreenBilling` 화면은 Apps in Toss host + bridge 환경에서만 직접 launch를 연결한다. 따라서 이 단계는 **Apps in Toss 내부 진입이 가능한 운영자/개발자 수동 검증**으로 본다.
+현재 저장소 기준으로 Apps in Toss host + bridge 결제 코드는 남아 있지만, 기본 릴리스에서는 billing flag가 꺼져 있다. 아래 단계는 **사업자등록/심사 완료 후 `ENABLE_TOSS_BILLING=true`, `VITE_ENABLE_TOSS_BILLING=true`로 재빌드한 운영자/개발자 수동 검증**으로 본다.
 
 1. Apps in Toss 인증이 가능한 테스트 환경에서 `/#/billing` 진입
 2. 초기 로드에서 `GET /billing/subscription`, `GET /billing/plans` 확인
@@ -126,7 +124,7 @@ curl -I "https://APP_DOMAIN"
 
 - verify-session 성공 후에만 payment launch payload 준비 성공
 - webhook 이후 현재 플랜 상태가 별도 수작업 없이 갱신됨
-- Apps in Toss 내부 `/#/billing` 진입에서만 launch가 연결되고, 일반 웹에서는 여전히 launch되지 않음
+- billing flag가 켜진 Apps in Toss 내부 `/#/billing` 진입에서만 launch가 연결되고, 일반 웹에서는 여전히 launch되지 않음
 
 ### 3.3 레거시/예외 상태
 
@@ -188,7 +186,7 @@ curl -I "https://APP_DOMAIN"
 아래 화면을 직접 확인한다.
 
 - `/`
-- `/#/verify`
+- `/#/verify` (public route redirect 확인)
 - `/#/session`
 - `/#/billing`
 - `/#/report/:id`
@@ -216,8 +214,8 @@ docker compose --env-file infra/.env.production -f infra/docker-compose.yml logs
 Go:
 
 - health check 통과
-- 전화번호 인증 동작
-- 결제 동작
+- 데모 인증 동작
+- 결제 보류 상태 동작
 - 세션 생성 동작
 - 실시간 통화 동작
 - 리포트 렌더링 동작

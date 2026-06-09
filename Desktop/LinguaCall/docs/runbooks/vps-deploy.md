@@ -9,11 +9,11 @@ This runbook is the source of truth for deploying the current LinguaCall launch 
 - `worker`: async batch worker
 - `caddy`: HTTPS termination and reverse proxy
 - `database`: Supabase Postgres
-- `auth`: Supabase Auth phone OTP
+- `auth`: Supabase Auth anonymous demo login
 - `billing`: Toss Payments
 - `voice`: browser WebRTC to OpenAI Realtime
 
-Twilio is not configured in this repository as an app env var. For phone OTP, Twilio is configured inside the Supabase dashboard under `Authentication > Providers > Phone`.
+Phone OTP code is preserved for future use, but the public portfolio build does not expose that route. Interviewers enter through a Supabase anonymous demo session, so no Twilio or SMS provider is required for the default demo.
 
 ## Prerequisites
 
@@ -26,7 +26,7 @@ Twilio is not configured in this repository as an app env var. For phone OTP, Tw
 - Supabase project created
 - Toss sandbox or live keys ready
 - OpenAI API key ready
-- Twilio configured in Supabase Phone Auth, or Supabase test phone numbers configured for testing
+- Supabase Anonymous Sign-Ins enabled for the public portfolio demo
 
 ## Repository layout
 
@@ -97,7 +97,7 @@ OPENAI_API_KEY=sk-...
 OPENAI_REALTIME_MODEL=gpt-realtime-mini
 OPENAI_REALTIME_VOICE=marin
 OPENAI_REALTIME_TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe
-OPENAI_EVAL_MODEL=gpt-4.1-mini
+OPENAI_EVAL_MODEL=gpt-4.1-nano
 ```
 
 ### Toss
@@ -106,7 +106,11 @@ OPENAI_EVAL_MODEL=gpt-4.1-mini
 TOSS_CLIENT_KEY=test_ck_...
 TOSS_SECRET_KEY=test_sk_...
 VITE_TOSS_CLIENT_KEY=test_ck_...
+ENABLE_TOSS_BILLING=false
+VITE_ENABLE_TOSS_BILLING=false
 ```
+
+Keep both billing flags `false` for the public portfolio demo. Set both to `true` only after business registration, Toss/AppInToss review, and a fresh sandbox-to-live billing verification pass.
 
 ### Worker
 
@@ -128,15 +132,14 @@ WORKER_BATCH_LIMIT=20
 
 In the Supabase dashboard:
 
-1. Go to `Authentication > Providers > Phone`
-2. Enable Phone Auth
-3. Configure one of:
-   - `Test Phone Numbers and OTPs` for non-SMS testing
-   - Twilio provider for real SMS delivery
+1. Go to `Authentication > Sign In / Providers`
+2. Enable `Anonymous Sign-Ins`
+3. Keep Phone Auth disabled or unused unless you intentionally re-open phone OTP later
 4. Go to `Authentication > URL Configuration`
 5. Set:
    - `Site URL = https://APP_DOMAIN`
    - `Redirect URLs = https://APP_DOMAIN/**`
+6. Review Auth rate limits. Supabase anonymous sign-ins use the signup endpoint and are IP-limited, which is suitable for a small portfolio demo but not for unrestricted public traffic.
 
 ## 5. Validate the env file
 
@@ -194,7 +197,7 @@ Expected:
 Run the browser flow from:
 
 - [`docs/runbooks/launch-e2e-checklist.md`](./launch-e2e-checklist.md)
-- [`docs/runbooks/supabase-phone-auth-manual.md`](./supabase-phone-auth-manual.md)
+- [`docs/runbooks/supabase-demo-auth-manual.md`](./supabase-demo-auth-manual.md)
 - [`docs/runbooks/toss-sandbox-manual.md`](./toss-sandbox-manual.md)
 
 ## 10. Common failure points
@@ -222,9 +225,8 @@ Check:
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
-- Phone Auth enabled in Supabase
+- Anonymous Sign-Ins enabled in Supabase
 - `Site URL` and `Redirect URLs`
-- Twilio or test phone settings in Supabase
 
 ### API returns 401 on protected routes
 

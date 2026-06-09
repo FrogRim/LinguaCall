@@ -13,7 +13,7 @@ import LanguagePicker from '../components/ui/LanguagePicker';
 import { getFriendlyCopy } from '../content/friendlyCopy';
 import {
   readBillingReturnState,
-  confirmWebBillingCheckout,
+  isTossBillingEnabled,
   resolveBillingLaunch,
   startAppsInTossBillingLaunch
 } from '../features/billing/checkout';
@@ -49,7 +49,7 @@ export default function ScreenBilling() {
   const navigate = useNavigate();
 
   const returnState = readBillingReturnState(window.location.href);
-  const { checkoutResult, hasLegacyReturn, shouldConfirm, tossRedirect } = returnState;
+  const { checkoutResult, hasLegacyReturn } = returnState;
   const copy = getFriendlyCopy(i18n.language);
   const isKo = i18n.language.startsWith('ko');
   const legacyNotice = hasLegacyReturn
@@ -94,17 +94,6 @@ export default function ScreenBilling() {
     window.history.replaceState({}, document.title, cleanUrl);
   }, [hasLegacyReturn]);
 
-  useEffect(() => {
-    if (!shouldConfirm || !tossRedirect) return;
-    const api = apiClient(getToken, refreshSession);
-    setLoading(true);
-    confirmWebBillingCheckout({ apiPost: api.post, ...tossRedirect })
-      .then(() => void load())
-      .catch((err) => setError(describeApiError(err, 'billing_confirm')))
-      .finally(() => setLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally run once on mount to handle Toss redirect return
-
   const handlePlanLaunch = useCallback(
     async (planCode: string) => {
       setLaunchingPlanCode(planCode);
@@ -116,7 +105,9 @@ export default function ScreenBilling() {
         const launchResolution = resolveBillingLaunch(runtime, {
           webNote: copy.billing.planActionWebNote,
           appsInTossUnavailableNote: copy.billing.planActionUnavailableNote,
-          hostUnavailableNotice: copy.billing.hostUnavailableNotice
+          hostUnavailableNotice: copy.billing.hostUnavailableNotice,
+          paymentDeferredNote: copy.billing.paymentDeferredNotice,
+          paymentEnabled: isTossBillingEnabled()
         });
 
         if (!launchResolution.shouldStartCheckout) {
@@ -145,6 +136,7 @@ export default function ScreenBilling() {
     [
       copy.billing.hostUnavailableNotice,
       copy.billing.launchFailedNotice,
+      copy.billing.paymentDeferredNotice,
       copy.billing.planActionUnavailableNote,
       copy.billing.planActionWebNote,
       getToken,
@@ -171,6 +163,9 @@ export default function ScreenBilling() {
             {legacyNotice}
           </StatusBanner>
         )}
+        <StatusBanner>
+          {copy.billing.paymentDeferredNotice}
+        </StatusBanner>
         {error && (
           <StatusBanner tone="danger">
             {error}

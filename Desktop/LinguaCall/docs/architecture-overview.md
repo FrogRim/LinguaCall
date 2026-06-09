@@ -10,7 +10,7 @@ LinguaCall is a self-hosted Korean-market MVP for short AI speaking practice ses
 
 Current launch assumptions:
 
-- auth: Supabase Auth phone OTP
+- auth: Supabase Auth anonymous demo login; phone OTP code is preserved but hidden from the public portfolio flow
 - session auth: Supabase access and refresh session in the browser, bearer auth to the API
 - billing: Toss only
 - voice runtime: browser WebRTC directly to OpenAI Realtime
@@ -40,7 +40,6 @@ External providers in the active path:
 - Supabase
 - OpenAI
 - Toss Payments
-- Twilio through Supabase Phone Auth
 
 ## 3. Repository layout
 
@@ -74,7 +73,7 @@ Key files:
 - `/#/`
   - landing and login start
 - `/#/verify`
-  - phone OTP verification
+  - redirects to login in the public portfolio build; phone OTP UI is preserved but hidden
 - `/#/session`
   - session hub, live session, history
 - `/#/billing`
@@ -92,11 +91,11 @@ The frontend no longer uses the old custom `/auth/otp/*` route family for active
 
 Current flow:
 
-1. `supabaseAuth.ts` requests phone OTP from Supabase
-2. `supabaseAuth.ts` verifies the OTP with Supabase
-3. access and refresh tokens are stored locally
-4. protected API calls use `Authorization: Bearer <token>`
-5. on expiry, the web app refreshes the session with Supabase and retries once
+1. `supabaseAuth.ts` creates an anonymous demo session with Supabase
+2. access and refresh tokens are stored locally
+3. protected API calls use `Authorization: Bearer <token>`
+4. on expiry, the web app refreshes the session with Supabase and retries once
+5. phone OTP helpers remain available in code for a later non-demo launch, but they are not exposed in the public route table
 
 ### Main UI surfaces
 
@@ -107,10 +106,10 @@ Current flow:
 
 Purpose:
 
-- enter the product
-- request phone OTP
-- verify OTP
-- continue into the app
+- enter the product through a demo CTA
+- create a Supabase anonymous session
+- continue into the app without SMS or payment friction
+- keep phone OTP UI hidden from public portfolio visitors
 
 #### Session hub
 
@@ -225,13 +224,12 @@ Twilio PSTN/media-stream code may still exist in the repository, but it is not t
 
 Current billing path:
 
-1. web requests checkout data from the API
-2. web launches Toss checkout
-3. Toss returns to the app
-4. web calls API confirm route
-5. API updates `subscriptions` and ledger state
+1. web shows plan state and upgrade copy
+2. public portfolio builds keep checkout disabled with `ENABLE_TOSS_BILLING=false`
+3. Apps in Toss and Toss Payments code remains implemented for a later approved billing launch
+4. when billing is explicitly enabled, payment launch and webhook routes update `subscriptions` and ledger state
 
-The app is Toss-only in the active launch path.
+The app is Toss-only in the implemented billing path, but payment launch is deferred for the public portfolio demo.
 
 ## 9. Deploy architecture
 
@@ -290,7 +288,7 @@ This is the main nuance to keep in mind when reviewing security or data access b
 
 Active:
 
-- Supabase Auth phone OTP
+- Supabase Auth anonymous demo login
 - Toss billing
 - OpenAI Realtime browser voice
 - VPS self-hosted deploy
@@ -303,4 +301,5 @@ Archival or secondary:
 - Vercel
 - SOLAPI login path
 - app-managed cookie auth
+- phone OTP public onboarding
 - Twilio PSTN/media-stream runtime

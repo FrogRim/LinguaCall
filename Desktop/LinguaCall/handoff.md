@@ -1,13 +1,13 @@
 # LinguaCall Handoff
 
-Last updated: 2026-05-10
+Last updated: 2026-06-09
 
 ## Current state
 
 Production stack is running on a VPS with Docker Compose.
 
-- auth: Supabase Auth phone OTP
-- billing: Toss Payments
+- auth: Supabase Auth anonymous demo login; phone OTP code preserved but hidden from the public portfolio flow
+- billing: Toss Payments implemented, checkout launch disabled by default for portfolio demo
 - voice: browser WebRTC → OpenAI Realtime (PTT mode)
 - database: Supabase Postgres
 - deploy: `web + api + worker + caddy` on VPS
@@ -16,9 +16,15 @@ Production stack is running on a VPS with Docker Compose.
 
 Commit: `5f73fef` (billing return handling hardening)
 
-Latest production changes:
-- billing UI runs real checkout again: Toss Payments widget on `platform === web`, Apps in Toss native handoff (`startAppsInTossBillingLaunch`) when payment bridge exists
-- Supabase migrations applied:
+Latest local changes pending deployment:
+- public login now starts a Supabase anonymous demo session from `ScreenLogin.tsx`; `/#/verify` redirects away so phone OTP is not visible to interviewers
+- free/demo session duration UI now follows the active plan limit, defaulting to 3 minutes for the portfolio cost profile
+- OpenAI report-evaluation default model changed to `gpt-4.1-nano` for lower demo cost; env can still override
+- Supabase Auth/RLS alignment migration added: `packages/db/migrations/20260609_supabase_auth_rls_alignment.sql`
+- billing UI/API now treat Toss as implemented-but-deferred: `ENABLE_TOSS_BILLING=false`, `VITE_ENABLE_TOSS_BILLING=false` keep checkout/payment launch/legacy confirm closed
+- shared/api/worker TypeScript build scripts were tightened so build/typecheck failures are visible instead of masked
+
+Previously deployed Supabase migrations:
   - `20260424_pending_billing_checkouts.sql`
   - `20260425_pending_billing_checkout_claim.sql`
 
@@ -44,8 +50,8 @@ Browser
     → worker (async report + billing jobs)
 
 api / worker → Supabase Postgres
-web → Supabase Auth (phone OTP)
-web → Apps in Toss payment launch + Toss webhook sync
+web → Supabase Auth (anonymous demo sign-in; phone OTP hidden)
+web → deferred billing surface; Toss/AppInToss payment launch requires explicit billing flags
 web → OpenAI Realtime (WebRTC, PTT mode)
 ```
 
@@ -87,12 +93,15 @@ docker compose --env-file infra/.env.production -f infra/docker-compose.yml up -
 ## Next work
 
 - Phase 2: stage/situation 선택 UI (준비/모의/실전 + 언어별 프리셋) — **session_mode 컬럼 추가 완료, UI 완료. Supabase SQL Editor에서 마이그레이션 실행 필요: `packages/db/migrations/20260510_session_mode.sql`**
-- `/billing/apps-in-toss/payment-launch`는 최근 `/billing/apps-in-toss/verify-session` 성공 이력이 있어야만 열림. 현재 구현은 `appLogin`으로 받은 `authorizationCode`/`referrer`를 서버에서 교환해 짧은 TTL 세션으로 검증함
-- Apps in Toss 운영 전환 시 `APPS_IN_TOSS_PARTNER_API_KEY`, `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `VITE_TOSS_CLIENT_KEY`를 모두 live 값으로 교체 후 `web`/`api` 재빌드
+- Supabase Dashboard에서 `Authentication > Sign In / Providers > Anonymous Sign-Ins` 활성화 필요. 공개 포트폴리오 데모는 Twilio/SMS 없이 이 경로로 로그인함
+- Supabase SQL Editor에서 `packages/db/migrations/20260510_appintoss_session_limits.sql` 적용 필요. 이 migration이 free plan을 3분/평생 3회 데모 한도로 맞춤
+- Supabase SQL Editor에서 `packages/db/migrations/20260609_supabase_auth_rls_alignment.sql` 적용 필요. 이 migration은 `users.clerk_user_id`가 raw Supabase sub 또는 `supabase:<sub>` 둘 다 매칭되도록 RLS를 정렬하고 `sessions.updated_at`을 보강함
+- `/billing/apps-in-toss/payment-launch`는 최근 `/billing/apps-in-toss/verify-session` 성공 이력과 `ENABLE_TOSS_BILLING=true`가 모두 있어야만 열림
+- Apps in Toss 운영 전환 시 `APPS_IN_TOSS_PARTNER_API_KEY`, `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `VITE_TOSS_CLIENT_KEY`를 모두 live 값으로 교체하고 `ENABLE_TOSS_BILLING=true`, `VITE_ENABLE_TOSS_BILLING=true`로 `web`/`api` 재빌드
 - 운영 키 전환 후 Apps in Toss 내부에서 소액 실결제 1건으로 launch → webhook → 구독 반영까지 다시 확인
 - **[미배포] AppInToss 월 세션 한도 마이그레이션 적용 필요** — 아래 섹션 참고
 
-## 웹 Toss Payments 결제 — 구현 완료, 리디렉션만 비활성화 상태
+## Toss Payments 결제 — 구현 완료, 포트폴리오 데모에서는 결제 진입 비활성
 
 ### 배경
 
@@ -101,60 +110,43 @@ docker compose --env-file infra/.env.production -f infra/docker-compose.yml up -
 - **PC 웹 브라우저**: 일반 Toss Payments SDK 사용
 
 구독(정기결제)은 빌링키 관리가 필요하고 Toss 심사 기준이 까다롭기 때문에,
-백엔드·프론트엔드 코드는 모두 작성해두되 **결제창 진입 직전 단계만 의도적으로 막아둔 상태**다.
+백엔드·프론트엔드 코드는 모두 작성해두되 포트폴리오 공개 상태에서는 **결제 진입 전체를 flag로 막아둔 상태**다.
 
 ### 현재 구현 상태
 
 **백엔드** (`apps/api/src/routes/billing.ts`)
-- `POST /billing/checkout` — 웹용 체크아웃 세션 생성. 활성화됨.
-- `POST /billing/toss/confirm` — Toss API 호출 → `claimPendingCheckout` → `completePendingCheckout` → `handleWebhook` 순서로 구독 활성화. 활성화됨.
+- `POST /billing/checkout` — `ENABLE_TOSS_BILLING=false` 기본값에서는 403 반환.
+- `POST /billing/toss/confirm` — legacy web confirm도 403 반환. 포트폴리오 데모에서 자동 confirm 없음.
 - `POST /billing/apps-in-toss/verify-session` — AppInToss OAuth 검증. 활성화됨.
-- `POST /billing/apps-in-toss/payment-launch` — AppInToss 결제 세션 생성. 활성화됨.
+- `POST /billing/apps-in-toss/payment-launch` — verify-session 성공 + `ENABLE_TOSS_BILLING=true`가 모두 있어야 결제 세션 생성.
 
 **프론트엔드** (`apps/web/src/features/billing/checkout.ts`)
-- `startAppsInTossBillingLaunch()` — AppInToss 결제 시작. 사용 중.
+- `resolveBillingLaunch()` — `paymentEnabled=false`면 web/AppInToss 모두 결제 보류 메시지 반환.
+- `isTossBillingEnabled()` — `VITE_ENABLE_TOSS_BILLING === "true"`일 때만 결제 시작 허용.
+- `startAppsInTossBillingLaunch()` — AppInToss 결제 시작 구현은 유지.
 - `startWebBillingCheckout()` — `/billing/checkout` 호출 후 `BillingCheckoutSession` 반환. 구현됨, 미사용.
-- `confirmWebBillingCheckout()` — `/billing/toss/confirm` 호출. 구현됨, Toss 리디렉션 복귀 시 자동 실행됨.
+- `confirmWebBillingCheckout()` — 구현은 남아 있지만 `ScreenBilling`에서 자동 실행하지 않음.
 - `BillingReturnState.channel` — `'web' | 'appintoss' | null`. tossRedirect 있으면 'web', checkoutResult만 있으면 'appintoss'.
 
 **프론트엔드** (`apps/web/src/pages/ScreenBilling.tsx`)
-- 웹 브라우저에서 플랜 버튼 클릭 시 → `copy.billing.planActionWebNote` 메시지만 표시하고 API 호출하지 않음.
-- AppInToss 환경에서는 기존 흐름 그대로.
-- Toss 리디렉션 복귀 감지(`shouldConfirm`) useEffect는 살아있음 — 나중에 웹 결제 열면 자동으로 confirm 처리됨.
+- billing 페이지 상단에 포트폴리오 결제 보류 안내를 항상 표시.
+- 플랜 버튼 클릭 시 `VITE_ENABLE_TOSS_BILLING=false`면 API 호출 없이 결제 보류 메시지만 표시.
+- Toss legacy success/cancel 복귀 URL은 안내 후 URL 정리만 수행. confirm API 자동 호출 없음.
 
-### 웹 결제 활성화 방법 (나중에)
+### 결제 활성화 방법 (나중에)
 
 1. `infra/.env.production`에 아래 추가/수정:
    ```
    TOSS_SECRET_KEY=live_sk_...          # test → live
    TOSS_CLIENT_KEY=live_ck_...          # test → live
    VITE_TOSS_CLIENT_KEY=live_ck_...     # test → live
+   ENABLE_TOSS_BILLING=true
+   VITE_ENABLE_TOSS_BILLING=true
    BILLING_WEBHOOK_SECRET_TOSS=whsec_... # Toss 대시보드 > 웹훅에서 발급
    ```
    `ALLOWED_ORIGINS`와 `APP_BASE_URL`이 실제 앱 도메인과 일치하는지 확인 (콜백 URL 신뢰 검증에 사용됨).
 
-2. `ScreenBilling.tsx`의 `handlePlanLaunch` 웹 분기에서 주석 부분을 실제 로직으로 교체:
-   ```ts
-   // 현재 (막힌 상태)
-   } else {
-     // web Toss checkout: backend ready, redirect intentionally disabled pending billing-key review
-     setError(copy.billing.planActionWebNote);
-   }
-
-   // 교체할 내용
-   } else {
-     const session = await startWebBillingCheckout({
-       apiPost: api.post,
-       originUrl: window.location.origin + window.location.pathname,
-       planCode
-     });
-     if (session.checkoutUrl) {
-       window.location.href = session.checkoutUrl;
-     } else {
-       setError(copy.billing.launchFailedNotice);
-     }
-   }
-   ```
+2. 일반 웹 checkout까지 다시 열려면 `ScreenBilling.tsx`에서 `startWebBillingCheckout()` 호출 분기를 별도로 복구해야 한다. 현재 포트폴리오 공개 빌드는 Apps in Toss payment launch만 flag로 다시 열 수 있게 남겨둔 상태다.
 
 3. `web`, `api` 이미지 재빌드 후 배포.
 

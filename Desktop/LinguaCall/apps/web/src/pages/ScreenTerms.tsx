@@ -9,7 +9,7 @@ export default function ScreenTerms() {
     <StaticDocumentPage
       eyebrow={isKo ? '서비스 이용 안내' : 'Service terms'}
       title={isKo ? '이용약관' : 'Terms of Service'}
-      updatedAt="2026-03-20"
+      updatedAt="2026-06-09"
       locale={i18n.language}
     >
       <section className="space-y-3">
@@ -32,18 +32,19 @@ export default function ScreenTerms() {
       <section className="space-y-3">
         <h2>{isKo ? '2. 계정 및 인증' : '2. Accounts and verification'}</h2>
         <ul>
-          <li>{isKo ? '서비스는 전화번호 OTP 인증을 사용합니다.' : 'The service uses phone OTP verification.'}</li>
-          <li>{isKo ? '사용자는 본인이 접근 가능한 번호만 등록해야 합니다.' : 'You must use a phone number you control.'}</li>
-          <li>{isKo ? '세션 보안을 위해 서비스는 일정 조건에서 재인증을 요청할 수 있습니다.' : 'The service may require re-verification in certain security scenarios.'}</li>
+          <li>{isKo ? '공개 포트폴리오 데모는 Supabase 익명 데모 로그인을 사용합니다.' : 'The public portfolio demo uses Supabase anonymous demo login.'}</li>
+          <li>{isKo ? '전화번호 OTP 인증 코드는 보존되어 있지만 현재 공개 데모에서는 노출하지 않습니다.' : 'Phone OTP verification code is preserved, but it is not exposed in the current public demo.'}</li>
+          <li>{isKo ? '세션 보안을 위해 서비스는 일정 조건에서 재로그인을 요청할 수 있습니다.' : 'The service may require re-login in certain security scenarios.'}</li>
         </ul>
       </section>
 
       <section className="space-y-3">
         <h2>{isKo ? '3. 결제 및 구독' : '3. Billing and subscriptions'}</h2>
         <ul>
-          <li>{isKo ? '유료 플랜은 Toss Payments를 통해 처리됩니다.' : 'Paid plans are processed through Toss Payments.'}</li>
+          <li>{isKo ? '유료 플랜 결제는 포트폴리오 데모에서 비활성화되어 있습니다.' : 'Paid plan checkout is disabled in the portfolio demo.'}</li>
+          <li>{isKo ? 'Toss Payments 연동은 구현되어 있으며, 사업자등록과 심사 완료 후 운영 결제로 전환할 수 있습니다.' : 'The Toss Payments integration is implemented and can be enabled after business registration and provider review.'}</li>
           <li>{isKo ? '플랜별 제공 분수와 최대 세션 시간은 안내된 정책을 따릅니다.' : 'Included minutes and max session length follow the published plan rules.'}</li>
-          <li>{isKo ? '결제 후 실제 이용 가능 상태 반영에는 짧은 지연이 있을 수 있습니다.' : 'There may be a short delay between payment confirmation and entitlement updates.'}</li>
+          <li>{isKo ? '결제 기능을 활성화하기 전까지는 결제 또는 자동 과금이 발생하지 않습니다.' : 'No payment or automatic charge is created before billing is explicitly enabled.'}</li>
         </ul>
       </section>
 

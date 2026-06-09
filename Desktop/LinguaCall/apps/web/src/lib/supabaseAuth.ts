@@ -1,11 +1,13 @@
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? '';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
+const SUPABASE_ENV = import.meta.env ?? {};
+const SUPABASE_URL = SUPABASE_ENV.VITE_SUPABASE_URL ?? '';
+const SUPABASE_ANON_KEY = SUPABASE_ENV.VITE_SUPABASE_ANON_KEY ?? '';
 const STORAGE_KEY = 'linguacall.supabase.session';
 
 type SupabaseUser = {
   id: string;
   phone?: string | null;
   email?: string | null;
+  is_anonymous?: boolean | null;
   user_metadata?: Record<string, unknown> | null;
 };
 
@@ -22,6 +24,11 @@ type SupabaseVerifyResponse = {
   expires_in?: number;
   expires_at?: number;
   user: SupabaseUser;
+};
+
+type SupabaseSessionResponse = SupabaseVerifyResponse | {
+  session?: Partial<SupabaseVerifyResponse> | null;
+  user?: SupabaseUser | null;
 };
 
 function ensureConfig() {
@@ -59,14 +66,26 @@ async function request<T>(path: string, init: RequestInit, accessToken?: string)
   return payload as T;
 }
 
-function normalizeSession(payload: SupabaseVerifyResponse): StoredSupabaseSession {
+export function normalizeSupabaseSession(payload: SupabaseSessionResponse): StoredSupabaseSession {
+  const root = payload as Partial<SupabaseVerifyResponse>;
+  const nested = 'session' in payload && payload.session ? payload.session : undefined;
+  const accessToken = root.access_token ?? nested?.access_token;
+  const refreshToken = root.refresh_token ?? nested?.refresh_token;
+  const expiresAt = root.expires_at ?? nested?.expires_at;
+  const expiresIn = root.expires_in ?? nested?.expires_in;
+  const user = root.user ?? nested?.user;
+
+  if (!accessToken || !refreshToken || !user) {
+    throw new Error('supabase_session_missing_fields');
+  }
+
   return {
-    accessToken: payload.access_token,
-    refreshToken: payload.refresh_token,
+    accessToken,
+    refreshToken,
     expiresAt:
-      payload.expires_at ??
-      (payload.expires_in ? Math.floor(Date.now() / 1000) + payload.expires_in : undefined),
-    user: payload.user
+      expiresAt ??
+      (expiresIn ? Math.floor(Date.now() / 1000) + expiresIn : undefined),
+    user
   };
 }
 
@@ -109,7 +128,7 @@ export async function verifySupabasePhoneOtp(phone: string, token: string): Prom
       type: 'sms'
     })
   });
-  return normalizeSession(payload);
+  return normalizeSupabaseSession(payload);
 }
 
 export async function refreshSupabaseSession(refreshToken: string): Promise<StoredSupabaseSession> {
@@ -119,7 +138,15 @@ export async function refreshSupabaseSession(refreshToken: string): Promise<Stor
       refresh_token: refreshToken
     })
   });
-  return normalizeSession(payload);
+  return normalizeSupabaseSession(payload);
+}
+
+export async function signInSupabaseDemoSession(): Promise<StoredSupabaseSession> {
+  const payload = await request<SupabaseSessionResponse>('/signup', {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+  return normalizeSupabaseSession(payload);
 }
 
 export async function signOutSupabase(accessToken: string) {

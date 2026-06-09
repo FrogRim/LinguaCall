@@ -238,7 +238,7 @@ const callGptEvaluator = async (systemPrompt: string, userPrompt: string): Promi
   const apiKey = (process.env.OPENAI_API_KEY ?? "").trim();
   if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
 
-  const model = (process.env.OPENAI_EVAL_MODEL ?? "gpt-5.4-mini").trim();
+  const model = (process.env.OPENAI_EVAL_MODEL ?? "gpt-4.1-nano").trim();
   const url = (process.env.OPENAI_EVAL_URL ?? "https://api.openai.com/v1/chat/completions").trim();
 
   const controller = new AbortController();

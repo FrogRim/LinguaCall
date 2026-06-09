@@ -4,6 +4,7 @@ import {
   persistSupabaseSession,
   readStoredSupabaseSession,
   refreshSupabaseSession,
+  signInSupabaseDemoSession,
   signOutSupabase,
   startSupabasePhoneOtp,
   verifySupabasePhoneOtp,
@@ -20,6 +21,7 @@ type UserContextValue = {
   uiLanguage: UiLanguageCode;
   setUiLanguage: (lang: UiLanguageCode) => Promise<void>;
   clearIdentity: () => Promise<void>;
+  startDemoSession: () => Promise<void>;
   startPhoneOtp: (phone: string) => Promise<void>;
   verifyPhoneOtp: (phone: string, code: string) => Promise<void>;
 };
@@ -116,6 +118,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     await startSupabasePhoneOtp(phone);
   }, []);
 
+  const startDemoSession = useCallback(async () => {
+    const nextSession = await signInSupabaseDemoSession();
+    persistSupabaseSession(nextSession);
+    setSession(nextSession);
+    const synced = await syncAuthStateWithApi(nextSession.accessToken);
+    setIsAuthenticated(synced);
+    setSessionChecked(true);
+    if (!synced) {
+      persistSupabaseSession(null);
+      setSession(null);
+      throw new Error('failed_to_sync_supabase_identity');
+    }
+  }, [syncAuthStateWithApi]);
+
   const verifyPhoneOtp = useCallback(async (phone: string, code: string) => {
     const nextSession = await verifySupabasePhoneOtp(phone, code);
     persistSupabaseSession(nextSession);
@@ -131,7 +147,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [syncAuthStateWithApi]);
 
   return (
-    <UserContext.Provider value={{ getToken, isAuthenticated, sessionChecked, refreshSession, uiLanguage, setUiLanguage, clearIdentity, startPhoneOtp, verifyPhoneOtp }}>
+    <UserContext.Provider value={{ getToken, isAuthenticated, sessionChecked, refreshSession, uiLanguage, setUiLanguage, clearIdentity, startDemoSession, startPhoneOtp, verifyPhoneOtp }}>
       {children}
     </UserContext.Provider>
   );

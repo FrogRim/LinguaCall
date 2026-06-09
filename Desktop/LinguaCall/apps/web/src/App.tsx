@@ -3,7 +3,6 @@ import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { UserProvider, useUser } from './context/UserContext';
 import ScreenLogin from './pages/ScreenLogin';
-import ScreenVerify from './pages/ScreenVerify';
 import ScreenSession from './pages/ScreenSession';
 import ScreenBilling from './pages/ScreenBilling';
 import ScreenReport from './pages/ScreenReport';
@@ -55,13 +54,6 @@ function LegacyBillingReturnScrubber() {
   return null;
 }
 
-function VerifyGate() {
-  const { isAuthenticated, sessionChecked } = useUser();
-  if (!sessionChecked) return null;
-  if (isAuthenticated) return <Navigate to="/session" replace />;
-  return <ScreenVerify />;
-}
-
 export default function App() {
   return (
     <UserProvider>
@@ -69,7 +61,7 @@ export default function App() {
         <LegacyBillingReturnScrubber />
         <Routes>
           <Route path="/" element={<ScreenLogin />} />
-          <Route path="/verify" element={<VerifyGate />} />
+          <Route path="/verify" element={<Navigate to="/" replace />} />
           <Route
             path="/session"
             element={

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   getSessionConstraintState,
+  resolveDurationOptions,
   selectSessionSpotlight
 } from "./sessionLaunchView";
 
@@ -152,4 +153,16 @@ test("getSessionConstraintState marks 10-minute-only launch access", () => {
 
 test("getSessionConstraintState marks 15-minute access when available", () => {
   assert.equal(getSessionConstraintState([10, 15]), "ten_or_fifteen");
+});
+
+test("resolveDurationOptions defaults portfolio demo access to 3 minutes", () => {
+  assert.deepEqual(resolveDurationOptions(undefined), [3]);
+});
+
+test("resolveDurationOptions limits free plans to the configured 3-minute demo", () => {
+  assert.deepEqual(resolveDurationOptions(3), [3]);
+});
+
+test("resolveDurationOptions exposes longer plan durations up to the configured max", () => {
+  assert.deepEqual(resolveDurationOptions(15), [3, 5, 10, 15]);
 });

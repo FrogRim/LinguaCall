@@ -1,6 +1,6 @@
 # Provider E2E 매트릭스
 
-Last updated: 2026-04-25
+Last updated: 2026-06-09
 
 ## 목적
 
@@ -8,8 +8,8 @@ Last updated: 2026-04-25
 
 현재 기준의 핵심 계약:
 
-- auth: Supabase Phone OTP
-- payment entry: Apps in Toss only
+- auth: Supabase anonymous demo login; phone OTP hidden in the public portfolio route
+- payment entry: disabled for public portfolio web; Apps in Toss payment launch only after explicit billing flags are enabled
 - payment completion sync: Toss webhook
 - live voice: browser WebRTC → OpenAI Realtime
 
@@ -20,14 +20,14 @@ Last updated: 2026-04-25
 | ID | 시나리오 | 환경 | 기대 UI | 기대 API / 이벤트 | 남겨야 할 증적 | 판정 |
 |---|---|---|---|---|---|---|
 | B1 | billing web mode | 일반 브라우저 | 플랜 비교/구독 상태만 보임, 유료 CTA 비활성, Apps in Toss 안내 문구 노출 | `GET /billing/plans`, `GET /billing/subscription`만 호출 | billing 화면 캡처, network 캡처 | blocking |
-| B2 | billing Apps in Toss mode | Apps in Toss host + bridge | ready notice 노출, 유료 CTA 활성 | `POST /billing/apps-in-toss/payment-launch` 200 | launch payload 응답, host 화면 캡처 | blocking |
+| B2 | billing Apps in Toss mode, billing flags enabled | Apps in Toss host + bridge + `ENABLE_TOSS_BILLING=true` | ready notice 노출, 유료 CTA 활성 | `POST /billing/apps-in-toss/payment-launch` 200 | launch payload 응답, host 화면 캡처 | blocking |
 | B3 | billing unsupported host | host hint 있음, bridge 없음 | host unavailable notice 노출, dead end 없음 | launch API 미호출 | unsupported 화면 캡처 | blocking |
 | B4 | legacy success return | 예전 success URL | success notice 노출, primary flow처럼 보이지 않음 | confirm API 미호출 | notice 화면, network 무호출 증적 | non-blocking |
 | B5 | legacy cancel return | 예전 cancel URL | cancel notice 노출, Apps in Toss 재진입 문구 표시 | confirm API 미호출 | notice 화면, network 무호출 증적 | non-blocking |
 | B6 | launch API validation failure | Apps in Toss host | 에러 배너 + 재시도/재진입 문구 | `POST /billing/apps-in-toss/payment-launch` 4xx | 응답 JSON, UI 캡처 | blocking |
 | B7 | webhook success sync | Apps in Toss sandbox 결제 완료 | billing 상태 새로고침 후 구독 반영 | `POST /billing/webhooks/toss`, `GET /billing/subscription` | 최신 subscription 조회, billing 화면 | blocking |
-| A1 | phone OTP success | 일반 브라우저 | `/verify` → `/session` 자연 이동 | Supabase OTP 성공, `/users/me` 접근 가능 | session 화면 캡처 | blocking |
-| A2 | OTP wrong/expired | 일반 브라우저 | 이해 가능한 에러 문구, 재시도 가능 | auth 실패, 보호 경로 유지 | 에러 UI 캡처 | blocking |
+| A1 | anonymous demo auth success | 일반 브라우저 | `/` CTA → `/session` 자연 이동 | Supabase anonymous signup 성공, `/users/me` 접근 가능 | session 화면 캡처, network 캡처 | blocking |
+| A2 | hidden phone OTP route | 일반 브라우저 | `/verify` 직접 접근 시 로그인 화면으로 redirect | OTP API 호출 없음, 보호 경로 유지 | redirect 화면, network 무호출 증적 | blocking |
 | V1 | live voice success | 데스크톱/모바일 브라우저 | 연결, 발화, 종료 가능 | session create/bootstrap/runtime complete | 세션 상태, transcript/report 증적 | blocking |
 | V2 | mic denied | 브라우저 | 치명적 붕괴 없이 실패 안내 | live start 실패 처리 | 실패 UI/로그 | blocking |
 | R1 | report generation | worker 동작 환경 | 리포트 렌더링, 교정/요약 표시 | report 생성 관련 API/worker 처리 | report 화면 캡처 | blocking |
@@ -42,7 +42,7 @@ Last updated: 2026-04-25
 - `POST /billing/checkout`, `POST /billing/toss/confirm`은 현재 primary path에서 나오면 안 된다.
 
 ### B2. billing Apps in Toss mode
-- Apps in Toss host에서만 유료 CTA가 활성화된다.
+- Apps in Toss host에서 billing flags가 켜진 경우에만 유료 CTA가 활성화된다.
 - launch contract는 `provider`, `planCode`, `orderId`, `orderName`, `amount`, `successUrl`, `failUrl`, `customerKey`를 포함해야 한다.
 
 ### B3. unsupported host
@@ -70,7 +70,7 @@ Last updated: 2026-04-25
 - Apps in Toss host에서 launch API가 안정적으로 준비되지 않음
 - webhook 반영 후 구독 상태가 일관되게 갱신되지 않음
 - unsupported/legacy 상태에서 사용자가 다음 행동을 이해할 수 없음
-- OTP, live voice, report 중 하나라도 blocking 수준으로 깨짐
+- demo auth, live voice, report 중 하나라도 blocking 수준으로 깨짐
 
 ---
 

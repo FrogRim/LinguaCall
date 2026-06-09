@@ -14,15 +14,16 @@ const COPY = {
         'LinguaCall helps you build a steady speaking habit with fast setup, short sessions, and simple feedback after each call.',
       bullets: [
         'Start with a short session instead of a long study block.',
-        'Use phone OTP once, then stay signed in on your device.',
-        'If you decide to upgrade, compare plans first and complete payment in Apps in Toss.'
+        'Use a demo session without SMS setup or payment friction.',
+        'Paid upgrades are visible for product context, but payment is disabled in the portfolio demo.'
       ],
-      primaryCta: 'Start with phone verification',
+      primaryCta: 'Try the demo now',
+      primaryCtaLoading: 'Preparing demo access...',
       secondaryCta: 'Compare plans first',
       secondaryCtaAppsInToss: 'Compare plans in Apps in Toss',
       valueTitle: 'Why people trust it',
       valueSummary:
-        'The product keeps the first step small: one number, one quick call, one clear next action.'
+        'The product keeps the first step small: one demo session, one quick call, one clear next action.'
     },
     verify: {
       eyebrow: 'Quick verification',
@@ -33,11 +34,11 @@ const COPY = {
       steps: [
         'Enter your number and request a one-time code.',
         'Confirm the code to create your secure session.',
-        'Start a short practice call now, or compare plans first and complete any upgrade in Apps in Toss.'
+        'Start a short practice call now, or review plans later; paid upgrades are disabled in this portfolio demo.'
       ],
       supportTitle: 'Built to feel low pressure',
       supportCopy:
-        'The goal is to get you speaking quickly. If you later need a plan change, the payment step continues inside Apps in Toss.'
+        'The goal is to get you speaking quickly. Billing code is prepared, but live payment is intentionally parked for portfolio use.'
     },
     session: {
       eyebrow: 'Practice hub',
@@ -50,8 +51,8 @@ const COPY = {
       spotlightScheduledPrefix: 'The nearest scheduled session is set for',
       spotlightEmptyTitle: 'Nothing urgent is waiting',
       spotlightEmptyDescription: 'Start with a short session now, or schedule one clear time later.',
-      constraintTenMinuteOnly: 'Your current access starts with a 10-minute session.',
-      constraintTenOrFifteen: 'Your current plan supports either a 10-minute or 15-minute session.',
+      constraintTenMinuteOnly: 'Your current access starts with the shortest demo session.',
+      constraintTenOrFifteen: 'Your current plan supports multiple demo session lengths.',
       quickActionsTitle: 'Start with one clear action',
       quickActions: [
         {
@@ -82,29 +83,30 @@ const COPY = {
     },
     billing: {
       eyebrow: 'Plans and billing',
-      title: 'Compare plans here, then continue payment in Apps in Toss.',
+      title: 'Compare plans here. Payment is disabled for the portfolio demo.',
       description:
-        'On the standalone web app, this screen stays focused on plan comparison and current subscription visibility. Actual payment continues only inside Apps in Toss through the in-app bridge.',
+        'Toss and Apps in Toss billing code is implemented, but paid checkout is intentionally gated while business registration and provider review are pending.',
       trustPoints: [
-        'Plan comparison on web',
-        'In-app bridge inside Apps in Toss',
-        'Subscription status visible on web and in-app'
+        'Supabase anonymous demo auth active',
+        'Plan and subscription surfaces visible',
+        'Toss payment launch parked for review'
       ],
       currentPlanTitle: 'Your current access',
       currentPlanDescription:
-        'Review what is active now here. If you need a paid plan change, reopen billing inside Apps in Toss to continue.',
-      plansTitle: 'Plans available in Apps in Toss checkout',
+        'Review what is active now here. Paid plan changes are not started in the public portfolio demo.',
+      plansTitle: 'Plans for portfolio review',
       plansDescription:
-        'Use this screen to compare plans first. Payment starts only inside Apps in Toss when the payment bridge is available.',
-      planActionLabel: 'Continue in Apps in Toss',
-      planActionWebNote: 'Plan changes stay available only inside Apps in Toss.',
-      planActionUnavailableNote: 'Reopen this page from Apps in Toss to continue with payment.',
-      launchFailedNotice: 'Apps in Toss could not open the payment handoff just now. Please try again from the latest in-app entry.',
-      appsInTossReadyNotice: 'You are inside Apps in Toss. Choose a plan below to continue with in-app payment.',
-      hostUnavailableNotice: 'This page looks like it opened from Toss, but the payment bridge is not available here yet. Reopen it from the latest Apps in Toss entry.',
-      legacyReturnNotice: 'This older web billing return link is no longer used. New plan changes now continue inside Apps in Toss.',
-      legacyReturnSuccessNotice: 'This older web success return opened correctly, but plan changes now continue inside Apps in Toss. Refresh your current access below if needed.',
-      legacyReturnCancelNotice: 'This older web cancel return is no longer the main flow. When you are ready, reopen billing inside Apps in Toss.'
+        'Use this screen to inspect product packaging. Checkout buttons show the deferred-payment state instead of opening Toss.',
+      planActionLabel: 'Payment deferred',
+      planActionWebNote: 'Paid upgrades are disabled in this portfolio demo while Toss review and business registration are pending.',
+      planActionUnavailableNote: 'Payment launch is disabled in this portfolio demo while Toss review and business registration are pending.',
+      paymentDeferredNotice: 'Paid upgrades are disabled in this portfolio demo while Toss review and business registration are pending.',
+      launchFailedNotice: 'Payment launch is currently disabled for portfolio use.',
+      appsInTossReadyNotice: 'Apps in Toss billing code is present, but payment launch is disabled for this portfolio demo.',
+      hostUnavailableNotice: 'Payment launch is disabled for this portfolio demo.',
+      legacyReturnNotice: 'This older web billing return link is no longer used. No payment confirmation runs in the portfolio demo.',
+      legacyReturnSuccessNotice: 'This older web success return opened correctly, but no payment confirmation runs in the portfolio demo.',
+      legacyReturnCancelNotice: 'This older web cancel return opened correctly. The subscription is unchanged.'
     },
     report: {
       eyebrow: 'Practice report',
@@ -130,15 +132,16 @@ const COPY = {
         'LinguaCall은 빠른 시작, 짧은 세션, 간단한 피드백으로 말하기 연습을 꾸준히 이어가도록 돕습니다.',
       bullets: [
         '긴 학습 블록 대신 짧은 통화 세션으로 시작합니다.',
-        '전화번호 OTP를 한 번만 거치면 이 기기에서 로그인 상태를 유지합니다.',
-        '유료 전환이 필요하면 플랜을 비교한 뒤 결제는 Apps in Toss에서 진행합니다.'
+        'SMS나 결제 없이 데모 세션으로 바로 체험할 수 있습니다.',
+        '유료 플랜은 제품 맥락을 보여주기 위해 노출하지만, 포트폴리오 데모에서는 결제를 비활성화했습니다.'
       ],
-      primaryCta: '전화번호로 시작하기',
+      primaryCta: '데모로 바로 체험하기',
+      primaryCtaLoading: '데모 접속 준비 중...',
       secondaryCta: '플랜 비교해보기',
       secondaryCtaAppsInToss: 'Apps in Toss에서 플랜 비교하기',
       valueTitle: '신뢰감을 먼저 만드는 이유',
       valueSummary:
-        '처음 단계는 작아야 합니다. 번호 입력, 짧은 통화, 다음 행동 하나만 명확하면 됩니다.'
+        '처음 단계는 작아야 합니다. 데모 세션, 짧은 통화, 다음 행동 하나만 명확하면 됩니다.'
     },
     verify: {
       eyebrow: '빠른 본인 확인',
@@ -149,11 +152,11 @@ const COPY = {
       steps: [
         '전화번호를 입력하고 인증 코드를 받습니다.',
         '코드를 확인하면 안전한 로그인 세션이 만들어집니다.',
-        '바로 짧은 통화를 시작하거나, 유료 전환이 필요하면 플랜을 비교한 뒤 Apps in Toss에서 이어서 진행합니다.'
+        '바로 짧은 통화를 시작하거나 나중에 플랜을 확인할 수 있습니다. 포트폴리오 데모에서는 유료 결제를 진행하지 않습니다.'
       ],
       supportTitle: '복잡한 가입 흐름을 만들지 않습니다',
       supportCopy:
-        '중요한 건 빨리 말하기 연습을 시작하는 것입니다. 나중에 플랜 변경이 필요해도 결제는 Apps in Toss 안에서 이어집니다.'
+        '중요한 건 빨리 말하기 연습을 시작하는 것입니다. 결제 코드는 준비되어 있지만 포트폴리오용으로 실제 결제는 보류했습니다.'
     },
     session: {
       eyebrow: '연습 허브',
@@ -166,8 +169,8 @@ const COPY = {
       spotlightScheduledPrefix: '가장 가까운 예약 세션은 다음 시간으로 잡혀 있습니다:',
       spotlightEmptyTitle: '급하게 확인할 항목은 없습니다',
       spotlightEmptyDescription: '지금 바로 짧은 세션을 시작하거나, 예약 시간 하나만 정해 두면 됩니다.',
-      constraintTenMinuteOnly: '현재 이용 상태에서는 10분 세션부터 시작할 수 있습니다.',
-      constraintTenOrFifteen: '현재 플랜에서는 10분 또는 15분 세션을 선택할 수 있습니다.',
+      constraintTenMinuteOnly: '현재 이용 상태에서는 가장 짧은 데모 세션부터 시작할 수 있습니다.',
+      constraintTenOrFifteen: '현재 플랜에서는 여러 데모 세션 길이를 선택할 수 있습니다.',
       quickActionsTitle: '가장 먼저 할 행동부터',
       quickActions: [
         {
@@ -198,29 +201,30 @@ const COPY = {
     },
     billing: {
       eyebrow: '플랜과 결제',
-      title: '여기서 플랜을 비교하고, 결제는 Apps in Toss에서 이어갑니다.',
+      title: '여기서 플랜을 비교합니다. 포트폴리오 데모에서는 결제를 비활성화했습니다.',
       description:
-        '단독 웹에서는 이 화면이 플랜 비교와 현재 구독 확인에 집중합니다. 실제 결제는 Apps in Toss 안에서 인앱 결제 브리지를 통해서만 이어집니다.',
+        'Toss와 Apps in Toss 결제 코드는 구현되어 있지만, 사업자등록과 심사가 끝날 때까지 유료 결제 진입은 의도적으로 막아두었습니다.',
       trustPoints: [
-        '웹에서 플랜 비교',
-        '앱인토스에서는 가능할 때 네이티브 결제 브리지',
-        '웹·앱 어디서나 구독 상태 확인 가능'
+        'Supabase 익명 데모 인증 활성화',
+        '플랜과 구독 화면 확인 가능',
+        'Toss 결제 진입은 심사 전 보류'
       ],
       currentPlanTitle: '현재 이용 상태',
       currentPlanDescription:
-        '여기서 현재 플랜을 확인하고, 유료 플랜 변경이 필요하면 Apps in Toss 안에서 다시 이어가면 됩니다.',
-      plansTitle: 'Apps in Toss 결제 전 플랜 비교',
+        '여기서 현재 플랜을 확인합니다. 공개 포트폴리오 데모에서는 유료 플랜 변경을 시작하지 않습니다.',
+      plansTitle: '포트폴리오 검토용 플랜',
       plansDescription:
-        '이 화면에서는 먼저 플랜만 비교합니다. 실제 결제 시작은 Apps in Toss에서 결제 브리지가 준비된 경우에만 가능합니다.',
-      planActionLabel: 'Apps in Toss에서 이어가기',
-      planActionWebNote: '플랜 변경은 Apps in Toss 안에서만 진행할 수 있습니다.',
-      planActionUnavailableNote: '결제를 이어가려면 Apps in Toss 최신 진입 경로에서 이 페이지를 다시 열어 주세요.',
-      launchFailedNotice: '지금은 Apps in Toss 결제 연결을 열지 못했습니다. 최신 인앱 진입 경로에서 다시 시도해 주세요.',
-      appsInTossReadyNotice: '현재 Apps in Toss 안에 있습니다. 아래에서 플랜을 선택하면 인앱 결제로 이어집니다.',
-      hostUnavailableNotice: '토스에서 열린 페이지처럼 보이지만 결제 브리지가 아직 연결되지 않았습니다. 최신 Apps in Toss 진입 경로에서 다시 열어 주세요.',
-      legacyReturnNotice: '이전 웹 결제 복귀 링크는 더 이상 메인 경로가 아닙니다. 이제 플랜 변경은 Apps in Toss 안에서 진행합니다.',
-      legacyReturnSuccessNotice: '이전 웹 성공 복귀 링크로 돌아왔지만, 이제 플랜 변경은 Apps in Toss 안에서 이어집니다. 필요하면 아래에서 현재 이용 상태를 새로고침해 확인해 주세요.',
-      legacyReturnCancelNotice: '이전 웹 취소 복귀 경로가 열렸습니다. 다시 진행하려면 Apps in Toss 안에서 빌링을 열어 주세요.'
+        '제품 패키징을 확인하기 위한 화면입니다. 결제 버튼은 Toss를 열지 않고 결제 보류 상태를 안내합니다.',
+      planActionLabel: '결제 보류',
+      planActionWebNote: 'Toss 심사와 사업자등록이 끝날 때까지 포트폴리오 데모에서는 유료 결제를 비활성화했습니다.',
+      planActionUnavailableNote: 'Toss 심사와 사업자등록이 끝날 때까지 포트폴리오 데모에서는 결제 진입을 막아두었습니다.',
+      paymentDeferredNotice: 'Toss 심사와 사업자등록이 끝날 때까지 포트폴리오 데모에서는 유료 결제를 비활성화했습니다.',
+      launchFailedNotice: '포트폴리오 데모에서는 결제 진입을 열지 않습니다.',
+      appsInTossReadyNotice: 'Apps in Toss 결제 코드는 준비되어 있지만, 이 포트폴리오 데모에서는 결제 진입을 막아두었습니다.',
+      hostUnavailableNotice: '포트폴리오 데모에서는 결제 진입을 열지 않습니다.',
+      legacyReturnNotice: '이전 웹 결제 복귀 링크가 열렸지만, 포트폴리오 데모에서는 결제 확인을 실행하지 않습니다.',
+      legacyReturnSuccessNotice: '이전 웹 성공 복귀 링크가 열렸지만, 포트폴리오 데모에서는 결제 확인을 실행하지 않습니다.',
+      legacyReturnCancelNotice: '이전 웹 취소 복귀 경로가 열렸습니다. 구독 상태는 변경되지 않았습니다.'
     },
     report: {
       eyebrow: '연습 리포트',

@@ -6,9 +6,9 @@ Real-time AI conversation practice for language exam preparation.
 
 LinguaCall is now a Korean-market MVP that has already been cut over to a self-hosted launch stack.
 
-- auth: Supabase Auth phone OTP
+- auth: Supabase Auth anonymous demo login; phone OTP code is preserved but hidden from the public portfolio flow
 - session auth: Supabase access/refresh session with bearer auth to API
-- billing: Toss only
+- billing: Toss implemented, checkout disabled by default for portfolio demo
 - runtime: browser-direct OpenAI Realtime voice over WebRTC
 - database: Supabase Postgres only
 - deploy: VPS self-hosted `web + api + worker + caddy`
@@ -19,8 +19,8 @@ Important security note: the active login path now uses Supabase Auth bearer ses
 
 ## Current Launch Direction
 
-- auth: Supabase Auth phone OTP + refresh session recovery
-- billing: Toss only
+- auth: Supabase Auth anonymous demo login + refresh session recovery
+- billing: Toss implemented, checkout disabled by default for portfolio demo
 - runtime: browser-direct OpenAI Realtime voice over WebRTC
 - data: Supabase Postgres only
 - deploy: self-hosted `web + api + worker` on a VPS
@@ -35,9 +35,9 @@ The current MVP launch path is complete enough to run real user tests.
 
 - deployed on a VPS with Docker Compose
 - HTTPS terminated by Caddy
-- phone OTP login working via Supabase Auth
+- anonymous demo login working via Supabase Auth
 - returning users can stay signed in on the same device via refresh-session recovery
-- Toss sandbox billing working
+- Toss billing code is implemented, with checkout launch disabled by default pending business registration/provider review
 - session creation working
 - realtime voice session bootstrapping working with PTT (Push-to-Talk) mode
 - worker-based async report processing wired in
@@ -52,12 +52,12 @@ Remaining work should be treated as launch hardening and product iteration, not 
 The project was materially simplified from its earlier SaaS-heavy setup.
 
 - removed Clerk from the active runtime path
-- replaced app-managed SMS login with Supabase Auth phone OTP
-- narrowed billing from multi-provider to Toss only
+- replaced app-managed SMS login with Supabase Auth anonymous demo login for the public portfolio flow
+- narrowed billing from multi-provider to Toss only, then gated checkout launch for portfolio use
 - moved background loops out of the API process into a dedicated worker
 - moved deployment from Railway/Vercel assumptions to VPS self-hosting
 - removed Sentry from the active bootstrap path
-- rewired the web app to Supabase Auth phone OTP and bearer-token API auth
+- rewired the web app to Supabase Auth bearer-token API auth, with public entry through anonymous demo sessions
 
 ## What Is Archival
 
@@ -86,8 +86,8 @@ Browser
 
 External providers:
 - OpenAI
+- Supabase Auth
 - Toss Payments
-- Twilio via Supabase Phone Auth
 ```
 
 ## Tech Stack
@@ -98,8 +98,8 @@ External providers:
 | Backend | Express 4, Node 20, TypeScript 5 |
 | Database | Supabase-managed PostgreSQL via `pg` |
 | AI / Voice | OpenAI Realtime API, WebRTC |
-| Auth | Supabase Auth phone OTP + bearer session |
-| Billing | Toss Payments |
+| Auth | Supabase Auth anonymous demo login + bearer session |
+| Billing | Toss Payments integration, gated by `ENABLE_TOSS_BILLING` |
 | Jobs | Dedicated `worker` process |
 | Testing | Vitest, Supertest |
 | Deployment | Docker Compose on a VPS |
@@ -108,10 +108,10 @@ External providers:
 
 ### Authentication
 
-1. web requests phone OTP from Supabase Auth
-2. web verifies the SMS code with Supabase Auth
-3. web stores Supabase access/refresh session locally
-4. protected API routes validate the bearer token and map it to the internal user record
+1. web creates an anonymous demo session with Supabase Auth
+2. web stores Supabase access/refresh session locally
+3. protected API routes validate the bearer token and map it to the internal user record
+4. phone OTP helpers remain in the codebase, but the public portfolio route hides that flow
 
 ### Learning session
 
@@ -124,10 +124,10 @@ External providers:
 ### Billing
 
 1. web shows plan comparison and current subscription visibility only
-2. Apps in Toss host runs `appLogin`, then calls `POST /billing/apps-in-toss/verify-session`
-3. only recently verified sessions can call `POST /billing/apps-in-toss/payment-launch`
-4. Toss webhook reaches the API after the in-app payment completes
-5. subscription and credit ledger state update in Postgres
+2. public portfolio builds keep `VITE_ENABLE_TOSS_BILLING=false` and `ENABLE_TOSS_BILLING=false`
+3. Apps in Toss host-session verification code remains implemented
+4. payment launch is allowed only after verification and only when billing flags are explicitly enabled
+5. Toss webhook/subscription settlement code remains available for a future approved billing launch
 
 ## Runtime Services
 
@@ -143,7 +143,6 @@ Only these external services are part of the current launch architecture:
 - [OpenAI](https://platform.openai.com/)
 - [Supabase](https://supabase.com/) for Auth and managed PostgreSQL
 - [Toss Payments](https://developers.tosspayments.com/)
-- Twilio via Supabase Phone Auth
 
 ## Key API Surface
 
@@ -202,6 +201,7 @@ API_BASE_URL=https://api.example.com
 ALLOWED_ORIGINS=https://app.example.com
 VITE_API_BASE_URL=https://api.example.com
 VITE_TOSS_CLIENT_KEY=test_ck_...
+VITE_ENABLE_TOSS_BILLING=false
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 
@@ -213,10 +213,11 @@ OPENAI_API_KEY=sk-...
 OPENAI_REALTIME_MODEL=gpt-realtime-mini
 OPENAI_REALTIME_VOICE=marin
 OPENAI_REALTIME_TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe
-OPENAI_EVAL_MODEL=gpt-4.1-mini
+OPENAI_EVAL_MODEL=gpt-4.1-nano
 
 TOSS_CLIENT_KEY=...
 TOSS_SECRET_KEY=...
+ENABLE_TOSS_BILLING=false
 APPS_IN_TOSS_PARTNER_API_KEY=...
 
 WORKER_SHARED_SECRET=replace-me
@@ -230,7 +231,7 @@ WORKER_BATCH_LIMIT=20
 - deploy runbook: [`docs/runbooks/vps-deploy.md`](docs/runbooks/vps-deploy.md)
 - launch E2E checklist: [`docs/runbooks/launch-e2e-checklist.md`](docs/runbooks/launch-e2e-checklist.md)
 - production readiness checklist: [`docs/runbooks/production-readiness-checklist.md`](docs/runbooks/production-readiness-checklist.md)
-- phone auth runbook: [`docs/runbooks/supabase-phone-auth-manual.md`](docs/runbooks/supabase-phone-auth-manual.md)
+- demo auth runbook: [`docs/runbooks/supabase-demo-auth-manual.md`](docs/runbooks/supabase-demo-auth-manual.md)
 - Toss sandbox manual: [`docs/runbooks/toss-sandbox-manual.md`](docs/runbooks/toss-sandbox-manual.md)
 - launch progress: [`docs/superpowers/reports/2026-03-23-auth-cutover-progress.md`](docs/superpowers/reports/2026-03-23-auth-cutover-progress.md)
 - launch design: [`docs/superpowers/specs/2026-03-23-saas-launch-refactor-design.md`](docs/superpowers/specs/2026-03-23-saas-launch-refactor-design.md)

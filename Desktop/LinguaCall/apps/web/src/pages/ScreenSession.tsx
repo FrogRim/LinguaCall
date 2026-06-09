@@ -25,6 +25,7 @@ import {
 } from '../features/session/liveSession';
 import {
   getSessionConstraintState,
+  resolveDurationOptions,
   selectSessionSpotlight
 } from '../features/session/sessionLaunchView';
 import { Button } from '../components/ui/button';
@@ -232,10 +233,10 @@ export default function ScreenSession() {
   const [mode, setMode] = useState<'immediate' | 'scheduled_once'>('immediate');
   const [level, setLevel] = useState('IM3');
   const [topic, setTopic] = useState('daily conversation');
-  const [duration, setDuration] = useState(10);
+  const [duration, setDuration] = useState(3);
   const [scheduledFor, setScheduledFor] = useState('');
   const [sessionMode, setSessionMode] = useState<SessionMode>('mock');
-  const [durationOptions, setDurationOptions] = useState([10]);
+  const [durationOptions, setDurationOptions] = useState([3]);
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
   const [formMessage, setFormMessage] = useState('');
@@ -283,17 +284,14 @@ export default function ScreenSession() {
       const activePlan =
         nextPlans.find(plan => plan.code === nextProfile.planCode) ??
         nextPlans.find(plan => plan.code === 'free');
-      const max = activePlan?.maxSessionMinutes && activePlan.maxSessionMinutes >= 10
-        ? activePlan.maxSessionMinutes
-        : 10;
-      const options = [10];
-      if (max >= 15) options.push(15);
-      setDurationOptions([...new Set(options)].sort((a, b) => a - b));
+      const options = resolveDurationOptions(activePlan?.maxSessionMinutes);
+      setDurationOptions(options);
       if (!options.includes(duration)) {
         setDuration(options[0]);
       }
     } catch {
-      setDurationOptions([10]);
+      setDurationOptions([3]);
+      setDuration(3);
     }
   }, [duration, makeApi]);
 
@@ -707,7 +705,7 @@ export default function ScreenSession() {
               />
               <MetricCard
                 label={isKo ? '세션 길이 기준' : 'Session length access'}
-                value={getSessionConstraintState(durationOptions) === 'ten_or_fifteen' ? '10 / 15 min' : '10 min'}
+                value={`${durationOptions.join(' / ')} min`}
                 detail={constraintMessage}
               />
             </div>
